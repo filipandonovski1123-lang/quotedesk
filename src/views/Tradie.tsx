@@ -340,7 +340,7 @@ function EnquiryFacts({ e }: { e: Enquiry }) {
         <ul className="mt-2 space-y-1">
           {e.fit.reasons.map((r) => (
             <li key={r.text} className="flex items-start gap-1.5 text-[12.5px]">
-              {r.good ? <Check className="mt-0.5 size-3.5 shrink-0 text-good" /> : <X className="mt-0.5 size-3.5 shrink-0 text-bad" />}
+              {r.neutral ? <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ink-3" /> : r.good ? <Check className="mt-0.5 size-3.5 shrink-0 text-good" /> : <X className="mt-0.5 size-3.5 shrink-0 text-bad" />}
               {r.text}
             </li>
           ))}

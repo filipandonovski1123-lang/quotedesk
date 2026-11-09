@@ -22,7 +22,7 @@ export function Landing() {
           <a href="#/demo" className="rounded-lg px-3 py-1.5 text-ink-2 hover:bg-surface-2 hover:text-ink">
             Try the demo
           </a>
-          <a href="#/app" className="rounded-lg bg-navy px-3 py-1.5 font-medium text-white hover:bg-ink">
+          <a href="#/app/signin" className="rounded-lg bg-navy px-3 py-1.5 font-medium text-white hover:bg-ink">
             Sign in
           </a>
         </nav>

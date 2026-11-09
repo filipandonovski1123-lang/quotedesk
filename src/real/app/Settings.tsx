@@ -10,9 +10,16 @@ import { enquiryLink, useApp } from './ctx';
 export function Settings() {
   const { user, profile } = useApp();
   const [p, setP] = useState<TradieProfile>(profile);
+  // The saved version this form started from. If it changes elsewhere (another phone) and there are
+  // no local edits, follow it instead of showing phantom "unsaved changes".
+  const [base, setBase] = useState<TradieProfile>(profile);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const dirty = JSON.stringify(p) !== JSON.stringify(profile);
+  const dirty = JSON.stringify(p) !== JSON.stringify(base);
+  if (base !== profile && !dirty) {
+    setBase(profile);
+    setP(profile);
+  }
   const set = (patch: Partial<TradieProfile>) => setP({ ...p, ...patch });
 
   const save = async () => {
@@ -20,6 +27,7 @@ export function Settings() {
     setMsg(null);
     try {
       await saveProfile(user.uid, p);
+      setBase(p);
       setMsg('Saved.');
     } catch {
       setMsg('Couldn’t save. Check your connection.');
@@ -30,7 +38,7 @@ export function Settings() {
 
   return (
     <div className="space-y-4 p-4 pb-28">
-      <LinkCard slug={profile.slug} />
+      <LinkCard profile={profile} />
 
       <Section title="Your business">
         <div className="grid grid-cols-2 gap-3">
@@ -43,6 +51,16 @@ export function Settings() {
         </div>
         <Field label="Business name">
           <input className={inputCls} value={p.business} maxLength={60} onChange={(e) => set({ business: e.target.value })} />
+        </Field>
+        <p className="-mt-1 text-[12px] text-ink-3">Your enquiry link stays the same if you rename the business, so links you’ve already shared keep working.</p>
+        <Field label="Trade" hint="Changes the built-in job types. Your own job types and any prices you’ve set are kept.">
+          <select className={inputCls} value={p.trade} onChange={(e) => set({ trade: e.target.value as TradieProfile['trade'] })}>
+            {Object.values(TRADES).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Postcodes you cover" hint="e.g. 2070-2125, 2150. Leave blank to skip the area check.">
           <input className={inputCls} value={p.areas} onChange={(e) => set({ areas: e.target.value })} />
@@ -128,7 +146,7 @@ export function Settings() {
           <p className="flex-1 text-[13px] text-ink-2">{dirty ? 'You have unsaved changes.' : msg}</p>
           {dirty && (
             <>
-              <Button size="sm" variant="ghost" onClick={() => setP(profile)}>
+              <Button size="sm" variant="ghost" onClick={() => setP(base)}>
                 Undo
               </Button>
               <Button size="sm" variant="primary" disabled={saving || !p.owner.trim() || !p.business.trim()} onClick={() => void save()}>
@@ -151,20 +169,23 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function LinkCard({ slug }: { slug: string }) {
-  const url = enquiryLink(slug);
-  const [copied, setCopied] = useState(false);
+export function LinkCard({ profile }: { profile: TradieProfile }) {
+  const url = enquiryLink(profile.slug);
+  const [copied, setCopied] = useState<'link' | 'text' | null>(null);
+  const missedCall = `Sorry I missed your call, I'm on a job. For the fastest price, send me the details and a few photos here: ${url} – ${profile.owner}, ${profile.business}`;
+  const copy = (what: 'link' | 'text', s: string) =>
+    void navigator.clipboard.writeText(s).then(
+      () => (setCopied(what), setTimeout(() => setCopied(null), 1500)),
+      () => undefined,
+    );
   return (
     <Card className="border-navy bg-navy p-4 text-white">
       <p className="text-[12.5px] text-white/70">Your enquiry link</p>
       <p className="mt-0.5 font-mono text-[13px] break-all">{url}</p>
       <p className="mt-1.5 text-[12.5px] text-white/80">Put it on your website, Google profile, Facebook page and your missed-call text. Every enquiry arrives with photos, budget and timing.</p>
       <div className="mt-3 flex gap-2">
-        <button
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-[13px] font-medium text-navy"
-          onClick={() => void navigator.clipboard.writeText(url).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)))}
-        >
-          <Copy className="size-3.5" /> {copied ? 'Copied' : 'Copy link'}
+        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 text-[13px] font-medium text-navy" onClick={() => copy('link', url)}>
+          <Copy className="size-3.5" /> {copied === 'link' ? 'Copied' : 'Copy link'}
         </button>
         {'share' in navigator && (
           <button className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/30 px-3 text-[13px] font-medium" onClick={() => void navigator.share({ url, title: 'Get a price' }).catch(() => undefined)}>
@@ -174,6 +195,14 @@ export function LinkCard({ slug }: { slug: string }) {
         <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-8 items-center rounded-lg border border-white/30 px-3 text-[13px] font-medium">
           Preview
         </a>
+      </div>
+      <div className="mt-4 rounded-lg bg-white/10 p-3">
+        <p className="text-[12.5px] font-semibold">Missed-call text</p>
+        <p className="mt-1 text-[12.5px] leading-snug text-white/85">{missedCall}</p>
+        <button className="mt-2 inline-flex h-7 items-center gap-1.5 rounded-md bg-white px-2.5 text-[12.5px] font-medium text-navy" onClick={() => copy('text', missedCall)}>
+          <Copy className="size-3.5" /> {copied === 'text' ? 'Copied' : 'Copy text'}
+        </button>
+        <p className="mt-1.5 text-[11.5px] text-white/65">Set it as your phone’s auto-reply for missed calls (most phones and business apps can do this).</p>
       </div>
     </Card>
   );

@@ -75,6 +75,7 @@ export function pageFor(uid: string, p: TradieProfile): PublicPage {
     uid,
     business: p.business,
     owner: p.owner,
+    phone: p.phone,
     jobs: jobsFor(p.trade, p.customJobs, p.hiddenJobs).map((j) => ({ id: j.id, label: j.label, questions: j.questions })),
   };
 }
@@ -143,6 +144,15 @@ export function updateEnquiry(uid: string, id: string, patch: Partial<RealEnquir
   void _id;
   void _c;
   return updateDoc(doc(enquiries(uid), id), rest as Record<string, unknown>);
+}
+
+/** Permanently removes one enquiry, its photos and any quote page made for it. */
+export async function deleteEnquiry(uid: string, id: string, quoteToken?: string) {
+  const ref = doc(enquiries(uid), id);
+  const photos = await getDocs(collection(ref, 'photos'));
+  await Promise.all(photos.docs.map((p) => deleteDoc(p.ref)));
+  if (quoteToken) await deleteDoc(quoteRef(quoteToken)).catch(() => undefined);
+  await deleteDoc(ref);
 }
 
 // ---------- quotes customers can open and accept ----------

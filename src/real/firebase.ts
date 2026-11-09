@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 
 // Public web config: safe to ship. Access is controlled by firestore.rules, not by hiding these.
 const config = {
@@ -14,4 +14,8 @@ const config = {
 export const app = initializeApp(config);
 export const auth = getAuth(app);
 // Optional fields are left out rather than stored as undefined (which Firestore rejects).
-export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
+// A local copy on the device keeps the app usable on a job site with patchy signal; changes sync later.
+export const db = initializeFirestore(app, {
+  ignoreUndefinedProperties: true,
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});

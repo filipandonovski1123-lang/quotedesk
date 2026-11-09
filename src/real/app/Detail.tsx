@@ -1,10 +1,10 @@
 import clsx from 'clsx';
-import { ArrowLeft, Check, Clock, ExternalLink, Phone, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Check, Clock, ExternalLink, MessageSquare, Phone, Sparkles, Trash2, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Badge, Button, Card, Field, inputCls } from '../../components/ui';
 import { aud, fitLabel, jobOf, range, suggestAction, type Suggestion } from '../../lib/pricing';
-import { loadPhotos, newToken, publishQuote, updateEnquiry } from '../api';
-import { ago, DAY, draft, estimateOf, firstName, fitOf, followUpDraft, quoteDraft, quoteUrl, scheduleFollowUps, when } from '../logic';
+import { deleteEnquiry, loadPhotos, newToken, publishQuote, updateEnquiry } from '../api';
+import { ago, DAY, draft, estimateOf, firstName, fitOf, followUpDraft, quoteDraft, quoteUrl, scheduleFollowUps, smsHref, when } from '../logic';
 import type { LogEntry, RealEnquiry, RealStatus } from '../model';
 import { useApp } from './ctx';
 import { SendBox } from './SendBox';
@@ -41,6 +41,9 @@ export function Detail({ e, onBack }: { e: RealEnquiry; onBack: () => void }) {
             {job.label} · {e.postcode} · {ago(e.createdMs)}
           </p>
         </div>
+        <a href={smsHref(e.phone, `Hi ${firstName(e.name)}, `)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2.5 text-[13px] font-medium hover:bg-surface-2" aria-label={`Text ${e.name}`}>
+          <MessageSquare className="size-3.5" /> Text
+        </a>
         <a href={`tel:${e.phone.replace(/[^\d+]/g, '')}`} className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2.5 text-[13px] font-medium hover:bg-surface-2" aria-label={`Call ${e.name}`}>
           <Phone className="size-3.5" /> Call
         </a>
@@ -50,6 +53,16 @@ export function Detail({ e, onBack }: { e: RealEnquiry; onBack: () => void }) {
         <Actions e={e} />
         <Facts e={e} />
         <History e={e} />
+        <button
+          className="flex items-center gap-1.5 px-1 text-[12.5px] text-bad hover:underline"
+          onClick={() => {
+            if (!confirm(`Delete ${e.name}'s enquiry, photos and quote for good? This can't be undone.`)) return;
+            onBack();
+            void deleteEnquiry(user.uid, e.id, e.quote?.token).catch(() => alert('Couldn’t delete it. Check your connection and try again.'));
+          }}
+        >
+          <Trash2 className="size-3.5" /> Delete this enquiry
+        </button>
       </div>
     </div>
   );
@@ -152,6 +165,7 @@ function QuoteComposer({ e }: { e: RealEnquiry }) {
   const est = estimateOf(profile, e);
   const start = est ? Math.round(((est.low + est.high) / 2 - (e.depositPaid ? profile.visitFee : 0)) / 10) * 10 : 0;
   const [amount, setAmount] = useState(start ? String(start) : '');
+  const [notes, setNotes] = useState('');
   const [token] = useState(newToken);
   const [ready, setReady] = useState(false);
   const value = Number(amount.replace(/\D/g, '')) || 0;
@@ -170,6 +184,7 @@ function QuoteComposer({ e }: { e: RealEnquiry }) {
       amount: value,
       validUntil,
       paymentLink: profile.paymentLink,
+      notes: notes.trim().slice(0, 1500),
       status: 'open',
       createdAt: now,
     });
@@ -191,6 +206,9 @@ function QuoteComposer({ e }: { e: RealEnquiry }) {
         <>
           <Field label="Quote amount, including GST ($)">
             <input className={clsx(inputCls, 'mt-1 text-[16px]')} inputMode="numeric" value={amount} onChange={(ev) => setAmount(ev.target.value)} />
+          </Field>
+          <Field label="What’s included (optional)" hint="Shown under the price on their quote page: scope, materials, exclusions, timing.">
+            <textarea className={clsx(inputCls, 'mt-1 min-h-[90px] text-[13.5px]')} maxLength={1500} value={notes} onChange={(ev) => setNotes(ev.target.value)} placeholder="e.g. Supply and install large cat door in glass slider, includes new glass panel. Removal of old glass. 1 day." />
           </Field>
           <Button variant="primary" className="mt-2 w-full" disabled={value <= 0} onClick={() => setReady(true)}>
             Write the quote text
@@ -328,7 +346,7 @@ function Facts({ e }: { e: RealEnquiry }) {
         <ul className="mt-2 space-y-1">
           {fit.reasons.map((r) => (
             <li key={r.text} className="flex items-start gap-1.5 text-[13px]">
-              {r.good ? <Check className="mt-0.5 size-3.5 shrink-0 text-good" /> : <X className="mt-0.5 size-3.5 shrink-0 text-bad" />}
+              {r.neutral ? <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ink-3" /> : r.good ? <Check className="mt-0.5 size-3.5 shrink-0 text-good" /> : <X className="mt-0.5 size-3.5 shrink-0 text-bad" />}
               {r.text}
             </li>
           ))}

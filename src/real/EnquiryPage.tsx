@@ -1,11 +1,12 @@
 import clsx from 'clsx';
-import { Camera, CheckCircle2, Loader2, Send, X } from 'lucide-react';
+import { Camera, CheckCircle2, Loader2, MessageSquare, Send, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Button, Field, inputCls } from '../components/ui';
 import type { Answers, OtherQuotes, Timing } from '../lib/types';
 import { loadPage, submitEnquiry } from './api';
 import type { PublicPage } from './model';
 import { compressPhoto } from './photos';
+import { smsHref } from './logic';
 
 const TIMINGS: { value: Timing; label: string }[] = [
   { value: 'asap', label: 'As soon as possible' },
@@ -25,7 +26,10 @@ export default function EnquiryPage({ slug }: { slug: string }) {
   const [page, setPage] = useState<PublicPage | null | 'loading'>('loading');
   useEffect(() => {
     loadPage(slug)
-      .then(setPage)
+      .then((p) => {
+        setPage(p);
+        if (p) document.title = `Get a price · ${p.business}`;
+      })
       .catch(() => setPage(null));
   }, [slug]);
 
@@ -139,6 +143,17 @@ function Form({ page }: { page: PublicPage }) {
         <p className="mt-2 leading-relaxed text-ink-2">
           Thanks{name ? `, ${name.trim().split(/\s+/)[0]}` : ''}. {page.owner} will text you at {phone || 'your number'}, usually within a day, with a price guide or a time to come and look.
         </p>
+        {page.phone && (
+          <>
+            <a
+              href={smsHref(page.phone, `Hi ${page.owner}, it's ${name.trim() || 'a new customer'}. I've just sent you my job details and photos through your QuoteDesk link.`)}
+              className="mt-6 flex h-12 items-center justify-center gap-2 rounded-xl bg-navy text-[15px] font-semibold text-white"
+            >
+              <MessageSquare className="size-4" /> Let {page.owner} know by text
+            </a>
+            <p className="mt-2 text-center text-[12.5px] text-ink-3">Optional, but it usually gets you a faster reply.</p>
+          </>
+        )}
       </Shell>
     );
 
@@ -261,9 +276,15 @@ function Form({ page }: { page: PublicPage }) {
           </select>
         </Field>
 
-        <Field label="Anything else?">
-          <textarea className={clsx(inputCls, 'min-h-[80px]')} maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Access, deadlines, what you have in mind…" />
-        </Field>
+        {job?.questions.length ? (
+          <Field label="Anything else?">
+            <textarea className={clsx(inputCls, 'min-h-[80px]')} maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Access, deadlines, what you have in mind…" />
+          </Field>
+        ) : (
+          <Field label="Describe the job">
+            <textarea className={clsx(inputCls, 'min-h-[100px]')} maxLength={1000} required value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="What you need done, sizes, access, deadlines…" />
+          </Field>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Your name">

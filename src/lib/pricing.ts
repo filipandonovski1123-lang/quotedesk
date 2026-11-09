@@ -391,7 +391,7 @@ export function fitScore(est: { low: number; high: number } | null, e: FitInput)
   let score = 50;
   const add = (pts: number, text: string) => {
     score += pts;
-    reasons.push({ good: pts >= 0, text });
+    reasons.push({ good: pts >= 0, text, ...(pts === 0 ? { neutral: true } : {}) });
   };
 
   if (e.photos >= 2) add(10, `Sent ${e.photos} photos`);

@@ -32,6 +32,8 @@ export interface FollowUp {
 
 export interface FitReason {
   good: boolean;
+  /** Shown as information only, neither a plus nor a minus. */
+  neutral?: boolean;
   text: string;
 }
 

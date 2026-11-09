@@ -32,7 +32,8 @@ export function smsHref(phone: string, body: string) {
 
 const hello = (p: TradieProfile, e: RealEnquiry) => (p.tone === 'casual' ? `Hi ${firstName(e.name)}, ${p.owner} here from ${p.business}.` : `Hello ${firstName(e.name)}, this is ${p.owner} from ${p.business}.`);
 const signoff = (p: TradieProfile) => (p.tone === 'casual' ? `Cheers, ${p.owner}` : `Kind regards, ${p.owner}`);
-const job = (e: RealEnquiry) => e.jobLabel.toLowerCase();
+/** "your new deck", but just "your job" for a generic job name. */
+const job = (e: RealEnquiry) => (/^(general|other|new) job$/i.test(e.jobLabel.trim()) ? 'job' : e.jobLabel.toLowerCase());
 
 function payLine(p: TradieProfile) {
   if (!p.visitFee) return 'Just reply with a day and time that suits and I’ll lock it in.';
@@ -58,16 +59,16 @@ To give you an exact price I'll need to see it in person. ${payLine(p)}
 
 ${signoff(p)}`;
   const area = inArea(e.postcode, p.areas);
+  const far = !!area && !area.ok;
   const fit = fitOf(p, e);
-  const why =
-    area && !area.ok
-      ? "it's outside the area we cover, so we couldn't give it the attention it deserves"
-      : fit.reasons.some((r) => r.text.startsWith('Budget well under'))
-        ? "we wouldn't be able to do it properly within that budget, and I'd rather be upfront than waste your time"
-        : "we're not the right fit for it at the moment";
+  const why = far
+    ? "it's outside the area we cover, so we couldn't give it the attention it deserves"
+    : fit.reasons.some((r) => r.text.startsWith('Budget well under'))
+      ? "we wouldn't be able to do it properly within that budget, and I'd rather be upfront than waste your time"
+      : "we're booked up and can't take it on at the moment";
   return `${hello(p, e)} Thanks for thinking of us for your ${job(e)}. Unfortunately ${why}.
 
-I'd suggest asking a local tradie closer to you. All the best with it.
+${far ? "I'd suggest asking a tradie closer to you." : 'Sorry we can’t help this time.'} All the best with it.
 
 ${signoff(p)}`;
 }

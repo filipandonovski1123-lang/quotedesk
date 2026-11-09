@@ -13,7 +13,10 @@ export default function QuotePage({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     loadQuote(token)
-      .then(setQ)
+      .then((x) => {
+        setQ(x);
+        if (x) document.title = `Your quote from ${x.business}`;
+      })
       .catch(() => setQ(null));
   }, [token]);
 
@@ -50,6 +53,12 @@ export default function QuotePage({ token }: { token: string }) {
             <p className="text-[13px] text-ink-3">{q.jobLabel}</p>
             <p className="mt-1 text-[34px] font-semibold tabular-nums">{aud(q.amount)}</p>
             <p className="text-[13px] text-ink-2">Including GST · valid until {new Date(q.validUntil).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            {q.notes && (
+              <div className="mt-4 border-t border-line pt-3">
+                <p className="text-[12px] font-semibold tracking-wide text-ink-3 uppercase">What’s included</p>
+                <p className="mt-1 text-[14px] leading-relaxed whitespace-pre-line text-ink">{q.notes}</p>
+              </div>
+            )}
           </Card>
 
           {q.status === 'open' && Date.now() <= q.validUntil && (

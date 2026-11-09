@@ -4,7 +4,7 @@ import { Button, Field, inputCls } from '../../components/ui';
 import { authMessage, resetPassword, signIn, signUp } from '../api';
 
 export function AuthScreen() {
-  const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>('signup');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'reset'>(location.hash.includes('signin') ? 'signin' : 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);

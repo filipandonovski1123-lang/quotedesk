@@ -27,6 +27,8 @@ export interface PublicPage {
   uid: string;
   business: string;
   owner: string;
+  /** The tradie's mobile, so customers can tap to text "I've sent my details". */
+  phone?: string;
   jobs: { id: string; label: string; questions: Question[] }[];
 }
 
@@ -89,6 +91,8 @@ export interface PublicQuote {
   amount: number;
   validUntil: number;
   paymentLink: string;
+  /** What's included, exclusions, timing: shown under the price. */
+  notes?: string;
   status: 'open' | 'accepted' | 'declined';
   createdAt: number;
 }

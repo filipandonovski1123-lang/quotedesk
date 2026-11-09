@@ -1,10 +1,10 @@
 import clsx from 'clsx';
 import type { User } from 'firebase/auth';
-import { BarChart3, ChevronRight, Home, Inbox, Loader2, MessageSquare, Settings as Cog } from 'lucide-react';
+import { BarChart3, ChevronRight, Home, Inbox, Loader2, MessageSquare, Plus, Settings as Cog } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Badge, Card, Stat } from '../components/ui';
 import { aud, fitLabel, range } from '../lib/pricing';
-import { updateEnquiry, watchAuth, watchEnquiries, watchMyQuotes, watchProfile } from './api';
+import { saveProfile, updateEnquiry, watchAuth, watchEnquiries, watchMyQuotes, watchProfile } from './api';
 import { AuthScreen } from './app/Auth';
 import { Ctx, useApp, type AppData } from './app/ctx';
 import { Detail, FollowUpCard, STATUS } from './app/Detail';
@@ -38,12 +38,20 @@ function Signed({ user }: { user: User }) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => watchProfile(user.uid, setProfile), [user.uid]);
+  const hasProfile = !!profile && profile !== 'loading';
   useEffect(() => {
-    if (!profile || profile === 'loading') return;
+    if (!hasProfile) return;
     const a = watchEnquiries(user.uid, setEnquiries, () => setError('Can’t load your enquiries. Check your connection.'));
     const b = watchMyQuotes(user.uid, setQuotes);
     return () => (a(), b());
-  }, [user.uid, profile]);
+  }, [user.uid, hasProfile]);
+  // Once per session, rewrite the public enquiry page from the profile so it picks up newer fields.
+  const refreshed = useRef(false);
+  useEffect(() => {
+    if (!profile || profile === 'loading' || refreshed.current) return;
+    refreshed.current = true;
+    void saveProfile(user.uid, profile).catch(() => undefined);
+  }, [profile, user.uid]);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(t);
@@ -205,7 +213,7 @@ function Today({ onOpen }: { onOpen: (id: string) => void }) {
     <>
       {enquiries.length === 0 ? (
         <div className="space-y-3 p-4">
-          <LinkCard slug={profile.slug} />
+          <LinkCard profile={profile} />
           <Card className="p-4">
             <p className="text-[15px] font-semibold">Get your first enquiry</p>
             <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-[13.5px] text-ink-2">
@@ -262,12 +270,20 @@ function nextDue(list: RealEnquiry[], now: number) {
 }
 
 function AllEnquiries({ onOpen }: { onOpen: (id: string) => void }) {
-  const { enquiries } = useApp();
+  const { enquiries, profile } = useApp();
   const [show, setShow] = useState<'open' | 'closed'>('open');
   const closed = (e: RealEnquiry) => e.status === 'won' || e.status === 'lost' || e.status === 'declined';
   const list = enquiries.filter((e) => (show === 'closed' ? closed(e) : !closed(e)));
   return (
     <>
+      <a
+        href={`#/q/${profile.slug}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mx-4 mt-3 flex h-10 items-center justify-center gap-1.5 rounded-lg border border-dashed border-line bg-surface text-[13.5px] font-medium text-navy hover:bg-surface-2"
+      >
+        <Plus className="size-4" /> Add an enquiry from a phone call
+      </a>
       <div className="mx-4 mt-3 grid grid-cols-2 rounded-lg border border-line bg-surface p-0.5">
         {(['open', 'closed'] as const).map((x) => (
           <button key={x} onClick={() => setShow(x)} className={clsx('h-8 rounded-md text-[13px] font-medium', show === x ? 'bg-navy text-white' : 'text-ink-2')}>
