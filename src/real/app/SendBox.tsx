@@ -36,8 +36,11 @@ export function SendBox({
     setError(null);
     try {
       if (how === 'copy') {
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
+        // Copying can be blocked by the browser; recording the send still matters more.
+        setCopied(await navigator.clipboard.writeText(text).then(
+          () => true,
+          () => false,
+        ));
       }
       await onSent(text);
       if (how === 'sms') location.href = smsHref(phone, text);
@@ -61,7 +64,7 @@ export function SendBox({
           {busy ? <Loader2 className="size-4 animate-spin" /> : <MessageSquare className="size-4" />} {label} {name.split(' ')[0]}
         </Button>
         <Button variant="secondary" disabled={busy || !text.trim()} onClick={() => void go('copy')} title="Copy the text and mark it sent">
-          <Copy className="size-4" /> {copied ? 'Copied' : 'Copy'}
+          <Copy className="size-4" /> {copied ? 'Copied' : 'Copy and mark sent'}
         </Button>
         {onCancel && (
           <Button variant="ghost" onClick={onCancel}>
