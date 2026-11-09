@@ -229,7 +229,7 @@ function Settings() {
       </Card>
       <Field label="Trade (demo)" hint="Switching trade resets the demo with example customers for that trade.">
         <select className={inputCls} value={p.trade} onChange={(e) => updateProfile({ trade: e.target.value as TradeId })}>
-          {Object.values(TRADES).map((t) => (
+          {Object.values(TRADES).filter((t) => t.jobs.length).map((t) => (
             <option key={t.id} value={t.id}>
               {t.label}
             </option>

@@ -1,8 +1,8 @@
 import type { Answers, EnquiryInput, FitReason, OtherQuotes, Profile, Timing, TradeId } from './types';
 
 /**
- * Example rates so the prototype has something to show. They are rough illustrations, not real
- * market prices: in the product each tradie sets their own (here, via the rate multiplier).
+ * Price ranges. Every number here is a *starting* rate so a new tradie sees something sensible;
+ * each tradie edits their own in Settings, and can add jobs of their own for any trade.
  */
 
 export interface Question {
@@ -16,13 +16,23 @@ export interface Question {
   default: string | number | boolean;
 }
 
+export interface Rate {
+  id: string;
+  label: string;
+  unit: '$' | '$/m²' | '$/m' | '%' | '$ each';
+  default: number;
+}
+
+export type Rates = Record<string, number>;
+
 export interface JobType {
   id: string;
   label: string;
   questions: Question[];
-  /** Middle-of-the-range price in AUD, before the tradie's rate multiplier. */
-  mid: (a: Answers) => number;
-  /** How wide the ballpark is either side of the middle (0.15 = ±15%). */
+  rates: Rate[];
+  /** Middle-of-the-range price in AUD, from the answers and this tradie's rates. */
+  mid: (a: Answers, r: Rates) => number;
+  /** How wide the range is either side of the middle (0.15 = ±15%). */
   spread: number;
   /** Hours a site visit plus writing the quote usually takes, travel included. */
   quoteHours: number;
@@ -36,8 +46,20 @@ export interface Trade {
   jobs: JobType[];
 }
 
+/** A job the tradie defines themselves: a base fee plus a price per unit. Works for any trade. */
+export interface CustomJob {
+  id: string;
+  label: string;
+  /** e.g. "m²", "rooms", "lights". Empty means a fixed-price job with no quantity question. */
+  unit: string;
+  base: number;
+  perUnit: number;
+  spread: number;
+}
+
 const num = (a: Answers, k: string) => Number(a[k] ?? 0) || 0;
 const str = (a: Answers, k: string) => String(a[k] ?? '');
+const pctOf = (r: Rates, k: string) => 1 + (r[k] ?? 0) / 100;
 
 export const TRADES: Record<TradeId, Trade> = {
   decking: {
@@ -77,12 +99,19 @@ export const TRADES: Record<TradeId, Trade> = {
           { id: 'stairs', label: 'Needs stairs', type: 'boolean', default: false },
           { id: 'removal', label: 'Old deck to remove', type: 'boolean', default: false },
         ],
-        mid: (a) => {
-          const rate = { pine: 380, merbau: 560, composite: 660 }[str(a, 'material')] ?? 500;
-          let p = num(a, 'area') * rate;
-          if (str(a, 'height') === 'raised') p *= 1.22;
-          if (a.stairs) p += 1400;
-          if (a.removal) p += num(a, 'area') * 45;
+        rates: [
+          { id: 'pine', label: 'Treated pine', unit: '$/m²', default: 380 },
+          { id: 'merbau', label: 'Merbau / hardwood', unit: '$/m²', default: 560 },
+          { id: 'composite', label: 'Composite', unit: '$/m²', default: 660 },
+          { id: 'raised', label: 'Extra for raised decks', unit: '%', default: 22 },
+          { id: 'stairs', label: 'Stairs', unit: '$', default: 1400 },
+          { id: 'removal', label: 'Removing an old deck', unit: '$/m²', default: 45 },
+        ],
+        mid: (a, r) => {
+          let p = num(a, 'area') * (r[str(a, 'material')] ?? 500);
+          if (str(a, 'height') === 'raised') p *= pctOf(r, 'raised');
+          if (a.stairs) p += r.stairs ?? 0;
+          if (a.removal) p += num(a, 'area') * (r.removal ?? 0);
           return p;
         },
       },
@@ -105,10 +134,13 @@ export const TRADES: Record<TradeId, Trade> = {
             ],
           },
         ],
-        mid: (a) => {
-          const rate = { good: 42, weathered: 58, damaged: 80 }[str(a, 'condition')] ?? 55;
-          return Math.max(650, num(a, 'area') * rate);
-        },
+        rates: [
+          { id: 'good', label: 'Good condition', unit: '$/m²', default: 42 },
+          { id: 'weathered', label: 'Weathered', unit: '$/m²', default: 58 },
+          { id: 'damaged', label: 'Damaged boards', unit: '$/m²', default: 80 },
+          { id: 'minimum', label: 'Minimum job', unit: '$', default: 650 },
+        ],
+        mid: (a, r) => Math.max(r.minimum ?? 0, num(a, 'area') * (r[str(a, 'condition')] ?? 55)),
       },
     ],
   },
@@ -138,10 +170,17 @@ export const TRADES: Record<TradeId, Trade> = {
             ],
           },
         ],
-        mid: (a) => {
-          let p = num(a, 'rooms') * 680;
-          if (a.ceilings) p *= 1.3;
-          p *= { good: 1, some: 1.1, lots: 1.3 }[str(a, 'prep')] ?? 1.1;
+        rates: [
+          { id: 'room', label: 'Per room (walls)', unit: '$ each', default: 680 },
+          { id: 'ceilings', label: 'Extra for ceilings', unit: '%', default: 30 },
+          { id: 'some', label: 'Extra for some patching', unit: '%', default: 10 },
+          { id: 'lots', label: 'Extra for lots of patching', unit: '%', default: 30 },
+        ],
+        mid: (a, r) => {
+          let p = num(a, 'rooms') * (r.room ?? 0);
+          if (a.ceilings) p *= pctOf(r, 'ceilings');
+          const prep = str(a, 'prep');
+          if (prep === 'some' || prep === 'lots') p *= pctOf(r, prep);
           return p;
         },
       },
@@ -164,9 +203,15 @@ export const TRADES: Record<TradeId, Trade> = {
           },
           { id: 'storeys', label: 'Two storeys', type: 'boolean', default: false },
         ],
-        mid: (a) => {
-          let p = { small: 6500, medium: 10500, large: 15500 }[str(a, 'size')] ?? 10500;
-          if (a.storeys) p *= 1.28;
+        rates: [
+          { id: 'small', label: 'Small house', unit: '$', default: 6500 },
+          { id: 'medium', label: 'Medium house', unit: '$', default: 10500 },
+          { id: 'large', label: 'Large house', unit: '$', default: 15500 },
+          { id: 'storeys', label: 'Extra for two storeys', unit: '%', default: 28 },
+        ],
+        mid: (a, r) => {
+          let p = r[str(a, 'size')] ?? 10500;
+          if (a.storeys) p *= pctOf(r, 'storeys');
           return p;
         },
       },
@@ -189,15 +234,20 @@ export const TRADES: Record<TradeId, Trade> = {
             id: 'height',
             label: 'Height',
             type: 'select',
-            default: '0.6',
+            default: 'h06',
             options: [
-              { value: '0.6', label: 'Up to 0.6 m' },
-              { value: '1.0', label: 'Up to 1 m' },
-              { value: '1.5', label: 'Up to 1.5 m' },
+              { value: 'h06', label: 'Up to 0.6 m' },
+              { value: 'h10', label: 'Up to 1 m' },
+              { value: 'h15', label: 'Up to 1.5 m' },
             ],
           },
         ],
-        mid: (a) => num(a, 'length') * ({ '0.6': 480, '1.0': 740, '1.5': 1150 }[str(a, 'height')] ?? 600),
+        rates: [
+          { id: 'h06', label: 'Up to 0.6 m high', unit: '$/m', default: 480 },
+          { id: 'h10', label: 'Up to 1 m high', unit: '$/m', default: 740 },
+          { id: 'h15', label: 'Up to 1.5 m high', unit: '$/m', default: 1150 },
+        ],
+        mid: (a, r) => num(a, 'length') * (r[str(a, 'height')] ?? 600),
       },
       {
         id: 'turf',
@@ -208,7 +258,12 @@ export const TRADES: Record<TradeId, Trade> = {
           { id: 'area', label: 'Area', type: 'number', unit: 'm²', min: 10, max: 1000, default: 80 },
           { id: 'levelling', label: 'Needs levelling and soil', type: 'boolean', default: true },
         ],
-        mid: (a) => Math.max(900, num(a, 'area') * (a.levelling ? 48 : 30)),
+        rates: [
+          { id: 'laid', label: 'Turf laid', unit: '$/m²', default: 30 },
+          { id: 'levelled', label: 'Turf with levelling and soil', unit: '$/m²', default: 48 },
+          { id: 'minimum', label: 'Minimum job', unit: '$', default: 900 },
+        ],
+        mid: (a, r) => Math.max(r.minimum ?? 0, num(a, 'area') * ((a.levelling ? r.levelled : r.laid) ?? 40)),
       },
     ],
   },
@@ -227,7 +282,12 @@ export const TRADES: Record<TradeId, Trade> = {
           { id: 'count', label: 'How many lights', type: 'number', min: 1, max: 80, default: 12 },
           { id: 'dimmers', label: 'Dimmers', type: 'boolean', default: false },
         ],
-        mid: (a) => 180 + num(a, 'count') * 135 + (a.dimmers ? 240 : 0),
+        rates: [
+          { id: 'callout', label: 'Call-out', unit: '$', default: 180 },
+          { id: 'light', label: 'Per light', unit: '$ each', default: 135 },
+          { id: 'dimmers', label: 'Dimmers', unit: '$', default: 240 },
+        ],
+        mid: (a, r) => (r.callout ?? 0) + num(a, 'count') * (r.light ?? 0) + (a.dimmers ? (r.dimmers ?? 0) : 0),
       },
       {
         id: 'switchboard',
@@ -247,27 +307,52 @@ export const TRADES: Record<TradeId, Trade> = {
           },
           { id: 'ev', label: 'Add an EV charger too', type: 'boolean', default: false },
         ],
-        mid: (a) => (str(a, 'age') === 'old' ? 2400 : 1800) + (a.ev ? 1650 : 0),
+        rates: [
+          { id: 'old', label: 'Replacing old fuses', unit: '$', default: 2400 },
+          { id: 'partial', label: 'Upgrading a partial board', unit: '$', default: 1800 },
+          { id: 'ev', label: 'EV charger install', unit: '$', default: 1650 },
+        ],
+        mid: (a, r) => (r[str(a, 'age')] ?? 2000) + (a.ev ? (r.ev ?? 0) : 0),
       },
     ],
   },
+  other: {
+    id: 'other',
+    label: 'Another trade (set up your own jobs)',
+    business: 'Your Business',
+    owner: 'You',
+    jobs: [],
+  },
 };
 
-/** Demo service area: suburb names with a made-up distance from the tradie's base. */
-export const SUBURBS: { name: string; km: number }[] = [
-  { name: 'Hornsby', km: 4 },
-  { name: 'Epping', km: 9 },
-  { name: 'Castle Hill', km: 14 },
-  { name: 'Chatswood', km: 16 },
-  { name: 'Ryde', km: 18 },
-  { name: 'Parramatta', km: 22 },
-  { name: 'Manly', km: 31 },
-  { name: 'Penrith', km: 52 },
-];
+/** Turns a tradie-defined job into the same shape as the built-in ones. */
+export function customToJob(c: CustomJob): JobType {
+  return {
+    id: c.id,
+    label: c.label,
+    spread: c.spread,
+    quoteHours: 1.5,
+    questions: c.unit ? [{ id: 'qty', label: `How many ${c.unit}`, type: 'number', min: 1, max: 100000, default: 1 }] : [],
+    rates: [
+      { id: 'base', label: 'Base / call-out', unit: '$', default: c.base },
+      { id: 'perUnit', label: c.unit ? `Per ${c.unit}` : 'Per unit', unit: '$ each', default: c.perUnit },
+    ],
+    mid: (a) => c.base + (c.unit ? num(a, 'qty') * c.perUnit : 0),
+  };
+}
 
-export function jobOf(trade: TradeId, jobId: string): JobType {
-  const t = TRADES[trade];
-  return t.jobs.find((j) => j.id === jobId) ?? t.jobs[0]!;
+/** All jobs a tradie offers: their trade's built-in ones (minus any they switched off) plus their own. */
+export function jobsFor(trade: TradeId, custom: CustomJob[] = [], hidden: string[] = []): JobType[] {
+  return [...TRADES[trade].jobs.filter((j) => !hidden.includes(j.id)), ...custom.map(customToJob)];
+}
+
+export function ratesFor(job: JobType, overrides: Record<string, Rates> = {}): Rates {
+  return { ...Object.fromEntries(job.rates.map((r) => [r.id, r.default])), ...(overrides[job.id] ?? {}) };
+}
+
+export function jobOf(trade: TradeId, jobId: string, custom: CustomJob[] = []): JobType {
+  const all = jobsFor(trade, custom);
+  return all.find((j) => j.id === jobId) ?? all[0] ?? customToJob({ id: 'general', label: 'General job', unit: '', base: 0, perUnit: 0, spread: 0.3 });
 }
 
 export function defaultAnswers(job: JobType): Answers {
@@ -276,15 +361,23 @@ export function defaultAnswers(job: JobType): Answers {
 
 const roundTo = (n: number, step: number) => Math.round(n / step) * step;
 
+/** A price range for one job, or null when the tradie hasn't priced it (e.g. a custom job at $0). */
+export function rangeFor(job: JobType, answers: Answers, rates: Rates, multiplier = 1): { low: number; high: number } | null {
+  const mid = job.mid(answers, rates) * multiplier;
+  if (!(mid > 0)) return null;
+  const step = mid > 5000 ? 500 : mid > 1000 ? 100 : 10;
+  return { low: Math.max(step, roundTo(mid * (1 - job.spread), step)), high: roundTo(mid * (1 + job.spread), step) };
+}
+
+/** Demo helper: the demo tradie uses default rates scaled by one multiplier. */
 export function estimate(profile: Profile, jobId: string, answers: Answers, materialIndex = 100): { low: number; high: number } {
   const job = jobOf(profile.trade, jobId);
-  const mid = job.mid(answers) * profile.rateMultiplier * (materialIndex / 100);
-  const step = mid > 5000 ? 500 : 100;
-  return { low: roundTo(mid * (1 - job.spread), step), high: roundTo(mid * (1 + job.spread), step) };
+  return rangeFor(job, answers, ratesFor(job), profile.rateMultiplier * (materialIndex / 100)) ?? { low: 0, high: 0 };
 }
 
 export interface FitInput {
-  km: number;
+  /** null when we can't tell (no service area set). */
+  area: { ok: boolean; label: string } | null;
   photos: number;
   timing: Timing;
   budget: number | null;
@@ -293,7 +386,7 @@ export interface FitInput {
 }
 
 /** A 0–100 score for how likely this enquiry is to become a worthwhile job, with plain reasons. */
-export function fitScore(profile: Profile, est: { low: number; high: number }, e: FitInput): { score: number; reasons: FitReason[] } {
+export function fitScore(est: { low: number; high: number } | null, e: FitInput): { score: number; reasons: FitReason[] } {
   const reasons: FitReason[] = [];
   let score = 50;
   const add = (pts: number, text: string) => {
@@ -310,12 +403,12 @@ export function fitScore(profile: Profile, est: { low: number; high: number }, e
   else if (e.timing === 'browsing') add(-22, 'Just getting prices for now');
 
   if (e.budget === null) add(-5, 'No budget given');
+  else if (!est) add(0, `Budget about $${Math.round(e.budget).toLocaleString('en-AU')}`);
   else if (e.budget >= est.low) add(15, 'Budget covers the estimate');
   else if (e.budget >= est.low * 0.75) add(-4, 'Budget a little under the estimate');
   else add(-22, 'Budget well under the estimate');
 
-  if (e.km <= profile.radiusKm) add(6, `In your area (${e.km} km)`);
-  else add(-16, `Outside your area (${e.km} km)`);
+  if (e.area) add(e.area.ok ? 6 : -16, e.area.label);
 
   if (e.otherQuotes === 'none') add(10, 'Not getting other quotes');
   else if (e.otherQuotes === 'several') add(-10, 'Getting several quotes');
@@ -339,11 +432,49 @@ export function suggestAction(score: number): Suggestion {
   return 'decline';
 }
 
+// ---------- service area ----------
+
+/** Parses "2070-2125, 2150, 2000" into ranges. */
+export function parsePostcodes(text: string): [number, number][] {
+  return text
+    .split(/[,\s]+/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => {
+      const [a, b] = p.split('-').map((x) => Number(x));
+      return [a ?? NaN, b ?? a ?? NaN] as [number, number];
+    })
+    .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+}
+
+export function inArea(postcode: string, areas: string): { ok: boolean; label: string } | null {
+  const ranges = parsePostcodes(areas);
+  const pc = Number(postcode);
+  if (!ranges.length || !Number.isFinite(pc) || !postcode.trim()) return null;
+  const ok = ranges.some(([a, b]) => pc >= Math.min(a, b) && pc <= Math.max(a, b));
+  return { ok, label: ok ? `In your area (${postcode})` : `Outside your area (${postcode})` };
+}
+
+// ---------- demo-only service area ----------
+
+/** Demo service area: suburb names with a made-up distance from the tradie's base. */
+export const SUBURBS: { name: string; km: number }[] = [
+  { name: 'Hornsby', km: 4 },
+  { name: 'Epping', km: 9 },
+  { name: 'Castle Hill', km: 14 },
+  { name: 'Chatswood', km: 16 },
+  { name: 'Ryde', km: 18 },
+  { name: 'Parramatta', km: 22 },
+  { name: 'Manly', km: 31 },
+  { name: 'Penrith', km: 52 },
+];
+
 export function inputFit(profile: Profile, input: EnquiryInput, materialIndex: number) {
   const est = estimate(profile, input.jobType, input.answers, materialIndex);
   const km = SUBURBS.find((s) => s.name === input.suburb)?.km ?? 20;
-  return { est, km, fit: fitScore(profile, est, { ...input, km }) };
+  const area = { ok: km <= profile.radiusKm, label: km <= profile.radiusKm ? `In your area (${km} km)` : `Outside your area (${km} km)` };
+  return { est, km, fit: fitScore(est, { ...input, area }) };
 }
 
 export const aud = (n: number) => '$' + Math.round(n).toLocaleString('en-AU');
-export const range = (r: { low: number; high: number }) => `${aud(r.low)}–${aud(r.high)}`;
+export const range = (r: { low: number; high: number } | null) => (r ? `${aud(r.low)}–${aud(r.high)}` : 'Price after a look');

@@ -1,4 +1,4 @@
-export type TradeId = 'decking' | 'painting' | 'landscaping' | 'electrical';
+export type TradeId = 'decking' | 'painting' | 'landscaping' | 'electrical' | 'other';
 export type Answers = Record<string, string | number | boolean>;
 
 export type Timing = 'asap' | 'month' | 'flexible' | 'browsing';

@@ -15,8 +15,8 @@ describe('pricing', () => {
 
   it('scores a serious local customer above a far-away browser', () => {
     const est = { low: 10000, high: 14000 };
-    const good = fitScore(profile, est, { km: 4, photos: 3, timing: 'asap', budget: 15000, otherQuotes: 'none', notes: 'Before Christmas please, side access.' });
-    const poor = fitScore(profile, est, { km: 52, photos: 0, timing: 'browsing', budget: 4000, otherQuotes: 'several', notes: '' });
+    const good = fitScore(est, { area: { ok: true, label: 'In area' }, photos: 3, timing: 'asap', budget: 15000, otherQuotes: 'none', notes: 'Before Christmas please, side access.' });
+    const poor = fitScore(est, { area: { ok: false, label: 'Out of area' }, photos: 0, timing: 'browsing', budget: 4000, otherQuotes: 'several', notes: '' });
     expect(good.score).toBeGreaterThanOrEqual(70);
     expect(poor.score).toBeLessThan(35);
   });

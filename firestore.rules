@@ -1,0 +1,76 @@
+rules_version = '2';
+
+// Who can do what:
+// - A tradie reads and writes only their own profile, enquiries, photos and quotes.
+// - Anyone can send an enquiry (and up to 4 photos, within 15 minutes of it) to a tradie that exists,
+//   but can never read enquiries back.
+// - Anyone with a quote's unguessable link can see it and accept or decline it once. Nothing else.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function str(v, max) {
+      return v is string && v.size() <= max;
+    }
+
+    match /tradies/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /enquiries/{id} {
+        allow read, update, delete: if isOwner(uid);
+        allow create: if validEnquiry(uid);
+
+        match /photos/{n} {
+          allow read, delete: if isOwner(uid);
+          allow create: if n in ['0', '1', '2', '3']
+            && request.resource.data.keys().hasOnly(['data'])
+            && request.resource.data.data is string
+            && request.resource.data.data.size() < 400000
+            && get(/databases/$(database)/documents/tradies/$(uid)/enquiries/$(id)).data.createdAt > request.time - duration.value(15, 'm');
+        }
+      }
+    }
+
+    function validEnquiry(uid) {
+      let d = request.resource.data;
+      let fields = ['name', 'phone', 'postcode', 'jobType', 'jobLabel', 'answers', 'photoCount', 'timing', 'budget', 'otherQuotes', 'notes', 'status', 'createdAt', 'log', 'followUps', 'depositPaid'];
+      return exists(/databases/$(database)/documents/tradies/$(uid))
+        && d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+        && str(d.name, 80) && d.name.size() > 0
+        && str(d.phone, 20) && d.phone.size() >= 8
+        && d.postcode is string && d.postcode.matches('^[0-9]{4}$')
+        && str(d.jobType, 40) && str(d.jobLabel, 60)
+        && d.answers is map && d.answers.size() <= 12
+        && d.photoCount is int && d.photoCount >= 0 && d.photoCount <= 4
+        && d.timing in ['asap', 'month', 'flexible', 'browsing']
+        && (d.budget == null || (d.budget is number && d.budget >= 0 && d.budget <= 10000000))
+        && d.otherQuotes in ['none', 'one', 'several', 'unsure']
+        && str(d.notes, 1000)
+        && d.status == 'new' && d.createdAt == request.time
+        && d.log == [] && d.followUps == [] && d.depositPaid == false;
+    }
+
+    match /pages/{slug} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid && slug.matches('^[a-z0-9-]{1,45}$');
+      allow update: if signedIn() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /publicQuotes/{token} {
+      allow get: if true;
+      allow list: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid && token.size() >= 15;
+      allow update: if (signedIn() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid)
+        || (resource.data.status == 'open'
+            && request.resource.data.status in ['accepted', 'declined']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+  }
+}

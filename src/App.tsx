@@ -8,17 +8,15 @@ import { CustomerPhone } from './views/Customer';
 import { TradiePhone } from './views/Tradie';
 import { Phone } from './components/ui';
 
-type Page = 'demo' | 'business';
-
-export default function App() {
-  const [page, setPage] = useState<Page>('demo');
+/** The clickable demo (#/demo) and the business model page (#/business). */
+export default function DemoShell({ page }: { page: 'demo' | 'business' }) {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5">
-          <p className="text-[16px] font-semibold">
-            Quote<span className="text-accent">Desk</span> <span className="ml-1 text-[12px] font-medium text-ink-3">prototype</span>
-          </p>
+          <a href="#/" className="text-[16px] font-semibold">
+            Quote<span className="text-accent">Desk</span> <span className="ml-1 text-[12px] font-medium text-ink-3">demo</span>
+          </a>
           <nav className="ml-auto flex rounded-lg border border-line bg-surface p-0.5" aria-label="Pages">
             {(
               [
@@ -26,12 +24,15 @@ export default function App() {
                 ['business', 'How the business works', 'Business'],
               ] as const
             ).map(([id, label, short]) => (
-              <button key={id} onClick={() => setPage(id)} aria-current={page === id ? 'page' : undefined} className={clsx('h-8 rounded-md px-3 text-[13px] font-medium whitespace-nowrap', page === id ? 'bg-navy text-white' : 'text-ink-2 hover:text-ink')}>
+              <a key={id} href={`#/${id}`} aria-current={page === id ? 'page' : undefined} className={clsx('inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium whitespace-nowrap', page === id ? 'bg-navy text-white' : 'text-ink-2 hover:text-ink')}>
                 <span className="sm:hidden">{short}</span>
                 <span className="hidden sm:inline">{label}</span>
-              </button>
+              </a>
             ))}
           </nav>
+          <a href="#/app" className="hidden h-8 items-center rounded-md bg-accent px-3 text-[13px] font-medium text-white sm:inline-flex">
+            Start free pilot
+          </a>
         </div>
       </header>
       {page === 'demo' ? <Demo /> : <Business />}

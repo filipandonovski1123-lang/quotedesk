@@ -1,23 +1,48 @@
-# QuoteDesk prototype
+# QuoteDesk
 
-A clickable prototype of "gap #1" from the tradie research: stop quoting for free, and follow up every quote.
+Stop quoting for free. Follow up every quote.
 
-- **Live demo:** a customer phone and a tradie phone side by side. The customer fills in an enquiry. The tradie sees a price range and a fit score, and replies in one tap (paid site visit, ballpark or polite no). The customer pays a deposit, the tradie sends a quote, and follow-ups go out on days 2, 7 and 14. Skip days to watch it work.
-- **How the business works:** the flow, pricing, the tradie's return on $49 a month, QuoteDesk's own numbers, a three-year growth model, where customers come from, and the risks.
+Live: https://filipandonovski1123-lang.github.io/quotedesk/
 
-## What's simulated
+## What's in it
 
-- Messages are templates. The real product would have an AI model write them.
-- Prices use example rates.
-- No texts are sent and no cards are charged.
-- Demo customers act on made-up odds.
-- Data lives only in the browser (`localStorage`).
+| Address | What it is |
+|---|---|
+| `#/` | Landing page for tradies |
+| `#/app` | The real tradie app: sign up, set up, inbox, quotes, follow-ups, results, settings |
+| `#/q/<link-name>` | A tradie's public enquiry form. Customers add job details and photos; no account needed |
+| `#/quote/<token>` | The page a customer opens from a quote text to accept or decline |
+| `#/demo`, `#/business` | Clickable demo with simulated customers, and the business model |
+| `#/privacy`, `#/terms` | Pilot privacy policy and terms |
 
-## Run it
+## How the pilot works
+
+- **Texts** go from the tradie's own phone. QuoteDesk writes the message and opens Messages with it ready, so there's no SMS service to pay for, and replies go straight to the tradie.
+- **Payments** go directly to the tradie, through their own payment link (Stripe, Square, PayPal) or PayID, which QuoteDesk puts in the texts.
+- **Follow-ups** are scheduled on days 2, 7 and 14 (adjustable) and appear on the Today screen when due.
+- **Quote acceptance** happens online: the customer taps Accept and the job is marked won.
+- **Data** is stored in Firebase (project `quotedesk-4506`, Firestore and Auth). `firestore.rules` limits each tradie to their own data and lets the public only send enquiries and answer quotes.
+- **Photos** are shrunk in the browser and stored in Firestore (up to 4 per enquiry), so no paid storage plan is needed.
+
+## Upgrades that need paid accounts
+
+- **Automatic texts and follow-ups:** an SMS service (Twilio or MessageMedia) plus a server (Firebase Cloud Functions on the Blaze plan).
+- **AI-written messages:** an AI API key, called from a server function.
+- **Taking payments inside QuoteDesk:** Stripe Connect.
+
+## Develop
 
 ```bash
 npm install
 npm run dev
 ```
 
-`npm test` checks the pricing, fit score and business maths.
+```bash
+npm test
+```
+
+```bash
+npx firebase-tools deploy --only firestore:rules
+```
+
+Pushing to `master` deploys to GitHub Pages.
