@@ -6,6 +6,7 @@ import { Badge, Card, Stat } from '../components/ui';
 import { aud, fitLabel, range } from '../lib/pricing';
 import { saveProfile, updateEnquiry, watchAuth, watchEnquiries, watchMyQuotes, watchProfile } from './api';
 import { AuthScreen } from './app/Auth';
+import { refreshPush } from './push';
 import { Ctx, useApp, type AppData } from './app/ctx';
 import { Detail, FollowUpCard, STATUS } from './app/Detail';
 import { Onboarding } from './app/Onboarding';
@@ -51,6 +52,7 @@ function Signed({ user }: { user: User }) {
     if (!profile || profile === 'loading' || refreshed.current) return;
     refreshed.current = true;
     void saveProfile(user.uid, profile).catch(() => undefined);
+    void refreshPush(user.uid).catch(() => undefined);
   }, [profile, user.uid]);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 60_000);
@@ -100,7 +102,15 @@ function useAlerts(enquiries: RealEnquiry[] | null, quotes: PublicQuote[]) {
     const keys = [...enquiries.map((e) => `e:${e.id}`), ...quotes.filter((q) => q.status === 'accepted').map((q) => `q:${q.enquiryId}`)];
     if (seen.current) {
       const fresh = keys.filter((k) => !seen.current!.has(k));
-      if (fresh.length && typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
+      // Devices with phone alerts on get these from the server instead, so don't show them twice.
+      const pushOn = (() => {
+        try {
+          return !!localStorage.getItem('qd-push');
+        } catch {
+          return false;
+        }
+      })();
+      if (fresh.length && !pushOn && typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
         const e = enquiries.find((x) => fresh.includes(`e:${x.id}`));
         const q = quotes.find((x) => fresh.includes(`q:${x.enquiryId}`));
         try {

@@ -207,6 +207,8 @@ export async function deleteEverything(user: User, password: string, slug: strin
   }
   const quotes = await getDocs(query(collection(db, 'publicQuotes'), where('uid', '==', uid)));
   await Promise.all(quotes.docs.map((q) => deleteDoc(q.ref)));
+  const devices = await getDocs(collection(db, 'tradies', uid, 'devices'));
+  await Promise.all(devices.docs.map((d) => deleteDoc(d.ref)));
   if (slug) await deleteDoc(pageRef(slug)).catch(() => undefined);
   await deleteDoc(profileRef(uid));
   await deleteUser(user);

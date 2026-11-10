@@ -20,6 +20,11 @@ service cloud.firestore {
     match /tradies/{uid} {
       allow read, write: if isOwner(uid);
 
+      // Devices the tradie turned phone alerts on for.
+      match /devices/{device} {
+        allow read, write: if isOwner(uid);
+      }
+
       match /enquiries/{id} {
         allow read, update, delete: if isOwner(uid);
         allow create: if validEnquiry(uid);

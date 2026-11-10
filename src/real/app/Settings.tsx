@@ -1,11 +1,12 @@
 import clsx from 'clsx';
 import { Bell, Copy, Download, LogOut, Plus, Share2, Trash2 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button, Card, Field, inputCls } from '../../components/ui';
 import { TRADES, jobsFor, ratesFor, type CustomJob } from '../../lib/pricing';
 import { authMessage, deleteEverything, exportEverything, saveProfile, signOut } from '../api';
 import type { TradieProfile } from '../model';
 import { enquiryLink, useApp } from './ctx';
+import { disablePush, enablePush, pushState, type PushState } from '../push';
 
 export function Settings() {
   const { user, profile } = useApp();
@@ -279,22 +280,50 @@ function Prices({ p, set }: { p: TradieProfile; set: (x: Partial<TradieProfile>)
 }
 
 function Alerts() {
-  const supported = typeof Notification !== 'undefined';
-  const [perm, setPerm] = useState(supported ? Notification.permission : 'denied');
+  const { user } = useApp();
+  const [state, setState] = useState<PushState | 'loading'>('loading');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void pushState().then(setState);
+  }, []);
+  const run = async (fn: () => Promise<PushState>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      setState(await fn());
+    } catch {
+      setError('Couldn’t change alerts on this device. Try again, or check your browser’s notification settings.');
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <Section title="Alerts">
-      <p className="text-[13px] text-ink-2">Get a pop-up when a new enquiry or quote acceptance comes in while QuoteDesk is open in a tab or on your home screen.</p>
-      {!supported ? (
-        <p className="text-[12.5px] text-ink-3">This browser doesn’t support alerts. On iPhone, add QuoteDesk to your home screen first.</p>
-      ) : perm === 'granted' ? (
-        <p className="text-[13px] font-medium text-good">Alerts are on.</p>
-      ) : perm === 'denied' ? (
-        <p className="text-[12.5px] text-ink-3">Alerts are blocked. Turn them on in your browser’s site settings.</p>
+    <Section title="Phone alerts">
+      <p className="text-[13px] text-ink-2">A notification on this device for every new enquiry and every quote accepted, plus a 7am summary when follow-ups are due. Works even when QuoteDesk is closed. Turn it on for each phone or computer you use.</p>
+      {state === 'loading' ? null : state === 'not-ready' ? (
+        <p className="text-[12.5px] text-ink-3">Coming soon to your account.</p>
+      ) : state === 'needs-install' ? (
+        <p className="text-[12.5px] leading-relaxed text-ink-2">
+          On iPhone, alerts need QuoteDesk on your home screen: tap <strong>Share</strong> in Safari, then <strong>Add to Home Screen</strong>, open it from there and come back to this page.
+        </p>
+      ) : state === 'unsupported' ? (
+        <p className="text-[12.5px] text-ink-3">This browser can’t show alerts. Try Chrome, Edge or Safari.</p>
+      ) : state === 'blocked' ? (
+        <p className="text-[12.5px] text-ink-3">Alerts are blocked for this site. Allow notifications in your browser’s site settings, then reload.</p>
+      ) : state === 'on' ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[13px] font-medium text-good">Alerts are on for this device.</p>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(() => disablePush(user.uid))}>
+            Turn off
+          </Button>
+        </div>
       ) : (
-        <Button size="sm" onClick={() => void Notification.requestPermission().then(setPerm)}>
-          <Bell className="size-4" /> Turn on alerts
+        <Button size="sm" variant="primary" disabled={busy} onClick={() => void run(() => enablePush(user.uid))}>
+          <Bell className="size-4" /> Turn on alerts for this device
         </Button>
       )}
+      {error && <p className="text-[12.5px] text-bad">{error}</p>}
     </Section>
   );
 }
