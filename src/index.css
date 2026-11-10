@@ -1,24 +1,28 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/inter';
 
+/* "Worksite": navy for primary actions, orange only for urgent things, green for good news.
+   Text colours keep at least 4.5:1 contrast on the surfaces they sit on, for sunlight. */
 @theme {
-  --color-bg: #f4f2ee;
+  --color-bg: #f7f4ef;
   --color-surface: #ffffff;
-  --color-surface-2: #f1efea;
-  --color-line: #e3e0d9;
-  --color-ink: #1c2228;
-  --color-ink-2: #535b63;
-  --color-ink-3: #7a8087;
+  --color-surface-2: #f1eee8;
+  --color-line: #e3e8ee;
+  --color-line-strong: #c9d1da;
+  --color-ink: #17202a;
+  --color-ink-2: #4b5560;
+  --color-ink-3: #5f6872;
   --color-navy: #1f3347;
-  --color-accent: #e0662a;
+  --color-accent: #c9561c;
   --color-accent-soft: #fbe9df;
-  --color-good: #2f7a52;
-  --color-good-soft: #e1f0e7;
-  --color-mid: #9a6a12;
+  --color-good: #2e7d32;
+  --color-good-soft: #e5f2e6;
+  --color-mid: #8a5d0c;
   --color-mid-soft: #f6ecd6;
   --color-bad: #b2473a;
   --color-bad-soft: #f6e2df;
   --color-bubble: #e9eef3;
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 html,

@@ -53,6 +53,15 @@ export function Settings() {
         <Field label="Business name">
           <input className={inputCls} value={p.business} maxLength={60} onChange={(e) => set({ business: e.target.value })} />
         </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="ABN (optional)">
+            <input className={inputCls} inputMode="numeric" maxLength={20} value={p.abn ?? ''} onChange={(e) => set({ abn: e.target.value })} />
+          </Field>
+          <Field label="Licence no. (optional)">
+            <input className={inputCls} maxLength={30} value={p.licence ?? ''} onChange={(e) => set({ licence: e.target.value })} />
+          </Field>
+        </div>
+        <p className="-mt-1 text-[12px] text-ink-3">Shown on your quotes so customers can see you’re a real, licensed business.</p>
         <p className="-mt-1 text-[12px] text-ink-3">Your enquiry link stays the same if you rename the business, so links you’ve already shared keep working.</p>
         <Field label="Trade" hint="Changes the built-in job types. Your own job types and any prices you’ve set are kept.">
           <select className={inputCls} value={p.trade} onChange={(e) => set({ trade: e.target.value as TradieProfile['trade'] })}>

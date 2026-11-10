@@ -15,14 +15,14 @@ export function Landing() {
   return (
     <div className="min-h-dvh">
       <header className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4">
-        <p className="text-[18px] font-semibold">
+        <p className="text-[19px] font-bold">
           Quote<span className="text-accent">Desk</span>
         </p>
         <nav className="ml-auto flex items-center gap-1 text-[14px]">
           <a href="#/demo" className="rounded-lg px-3 py-1.5 text-ink-2 hover:bg-surface-2 hover:text-ink">
             Try the demo
           </a>
-          <a href="#/app/signin" className="rounded-lg bg-navy px-3 py-1.5 font-medium text-white hover:bg-ink">
+          <a href="#/app/signin" className="inline-flex h-10 items-center rounded-xl border border-line-strong bg-surface px-4 font-semibold hover:bg-surface-2">
             Sign in
           </a>
         </nav>
@@ -31,15 +31,15 @@ export function Landing() {
       <main className="mx-auto max-w-5xl px-4">
         <section className="py-12 md:py-20">
           <p className="text-[13px] font-semibold tracking-wide text-accent uppercase">For tradies who quote</p>
-          <h1 className="mt-3 max-w-3xl text-[34px] leading-[1.1] font-semibold md:text-[52px]">Stop quoting for free. Follow up every quote.</h1>
+          <h1 className="mt-3 max-w-3xl text-[36px] leading-[1.05] font-bold tracking-tight md:text-[56px]">Stop quoting for free. Follow up every quote.</h1>
           <p className="mt-4 max-w-2xl text-[16px] leading-relaxed text-ink-2 md:text-[18px]">
             QuoteDesk sorts serious customers from tyre-kickers before you drive out, gives you a price guide from your own rates, and makes sure no quote goes quiet without a follow-up.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <a href="#/app" className="inline-flex h-12 items-center rounded-xl bg-accent px-6 text-[15px] font-semibold text-white hover:brightness-95">
+            <a href="#/app" className="inline-flex h-14 items-center rounded-xl bg-navy px-7 text-[16px] font-bold text-white hover:bg-ink">
               Start free pilot
             </a>
-            <a href="#/demo" className="inline-flex h-12 items-center rounded-xl border border-line bg-surface px-6 text-[15px] font-medium hover:bg-surface-2">
+            <a href="#/demo" className="inline-flex h-14 items-center rounded-xl border border-line-strong bg-surface px-7 text-[16px] font-semibold hover:bg-surface-2">
               See how it works
             </a>
           </div>
@@ -50,7 +50,7 @@ export function Landing() {
           {FEATURES.map((f) => (
             <Card key={f.title} className="p-5">
               <div className="grid size-9 place-items-center rounded-lg bg-accent-soft text-accent">{f.icon}</div>
-              <p className="mt-3 text-[16px] font-semibold">{f.title}</p>
+              <p className="mt-3 text-[17px] font-bold">{f.title}</p>
               <p className="mt-1 text-[14px] leading-relaxed text-ink-2">{f.text}</p>
             </Card>
           ))}

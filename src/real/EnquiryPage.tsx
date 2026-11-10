@@ -159,9 +159,12 @@ function Form({ page }: { page: PublicPage }) {
 
   return (
     <Shell>
-      <p className="text-[13px] font-medium text-accent">{page.business}</p>
-      <h1 className="mt-1 text-[24px] leading-tight font-semibold">Get a price for your job</h1>
-      <p className="mt-2 text-[14px] leading-relaxed text-ink-2">A few quick questions and some photos, so {page.owner} can give you a price guide without waiting for a site visit.</p>
+      <div className="-mx-4 -mt-10 bg-navy px-4 pt-8 pb-6 text-white">
+        <p className="text-[24px] leading-tight font-bold">{page.business}</p>
+        <p className="mt-1 text-[13.5px] text-white/80">{page.owner}</p>
+      </div>
+      <h1 className="mt-6 text-[22px] leading-tight font-bold">Get a price for your job</h1>
+      <p className="mt-1.5 text-[14.5px] leading-relaxed text-ink-2">A few quick questions and some photos, and {page.owner} can give you a price guide without waiting for a site visit.</p>
 
       <form onSubmit={submit} className="mt-6 space-y-4">
         {page.jobs.length > 1 && (

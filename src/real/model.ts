@@ -16,6 +16,9 @@ export interface TradieProfile {
   visitFee: number;
   /** Where customers pay deposits: a Stripe/Square payment link, or PayID/bank details as text. */
   paymentLink: string;
+  /** Shown on quotes so customers can check the business is real. Optional. */
+  abn?: string;
+  licence?: string;
   tone: 'casual' | 'professional';
   followUpDays: [number, number, number];
   quoteValidDays: number;
@@ -93,6 +96,8 @@ export interface PublicQuote {
   paymentLink: string;
   /** What's included, exclusions, timing: shown under the price. */
   notes?: string;
+  abn?: string;
+  licence?: string;
   status: 'open' | 'accepted' | 'declined';
   createdAt: number;
 }

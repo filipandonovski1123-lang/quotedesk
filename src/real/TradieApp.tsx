@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import type { User } from 'firebase/auth';
-import { BarChart3, ChevronRight, Home, Inbox, Loader2, MessageSquare, Plus, Settings as Cog } from 'lucide-react';
+import { BarChart3, ChevronRight, Clock, Home, Inbox, Loader2, MessageSquare, Plus, Settings as Cog } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Badge, Card, Stat } from '../components/ui';
 import { aud, fitLabel, range } from '../lib/pricing';
@@ -129,7 +129,7 @@ function useAlerts(enquiries: RealEnquiry[] | null, quotes: PublicQuote[]) {
 type Tab = 'today' | 'enquiries' | 'quotes' | 'results' | 'settings';
 
 function Main() {
-  const { enquiries, now } = useApp();
+  const { enquiries, now, profile } = useApp();
   const [tab, setTab] = useState<Tab>('today');
   const [openId, setOpenId] = useState<string | null>(null);
   const open = enquiries.find((e) => e.id === openId);
@@ -147,12 +147,20 @@ function Main() {
     );
 
   const titles: Record<Tab, string> = { today: 'Today', enquiries: 'Enquiries', quotes: 'Quotes out', results: 'Results', settings: 'Settings' };
+  const subtitle: Record<Tab, string> = {
+    today: todo ? `${todo} thing${todo === 1 ? '' : 's'} to do` : 'Nothing waiting on you',
+    enquiries: 'Everyone who’s asked for a price',
+    quotes: 'Waiting on an answer',
+    results: 'What QuoteDesk has done for you',
+    settings: profile.business,
+  };
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-bg">
-      <header className="sticky top-0 z-10 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur">
-        <h1 className="text-[18px] font-semibold">{titles[tab]}</h1>
+      <header className="sticky top-0 z-10 bg-navy px-4 pt-4 pb-3.5 text-white">
+        <h1 className="text-[22px] leading-tight font-bold">{titles[tab]}</h1>
+        <p className="mt-0.5 text-[13px] text-white/75">{subtitle[tab]}</p>
       </header>
-      <div className="flex-1 pb-20">
+      <div className="flex-1 pb-24">
         {tab === 'today' && <Today onOpen={setOpenId} />}
         {tab === 'enquiries' && <AllEnquiries onOpen={setOpenId} />}
         {tab === 'quotes' && <Quotes onOpen={setOpenId} />}
@@ -172,10 +180,15 @@ function Main() {
 
 function TabBtn({ icon, label, active, onClick, count }: { icon: ReactNode; label: string; active: boolean; onClick: () => void; count?: number }) {
   return (
-    <button onClick={onClick} aria-current={active ? 'page' : undefined} className={clsx('relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium', active ? 'text-navy' : 'text-ink-3')}>
+    <button
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={clsx('relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11.5px]', active ? 'font-bold text-navy' : 'font-medium text-ink-3')}
+    >
+      {active && <span className="absolute inset-x-3 top-0 h-[3px] rounded-b bg-navy" aria-hidden />}
       {icon}
       {label}
-      {!!count && <span className="absolute top-1 right-[calc(50%-20px)] grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] text-white">{count}</span>}
+      {!!count && <span className="absolute top-1.5 right-[calc(50%-22px)] grid min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-bold text-white">{count}</span>}
     </button>
   );
 }
@@ -185,13 +198,17 @@ function Row({ e, onOpen, extra }: { e: RealEnquiry; onOpen: (id: string) => voi
   const fit = fitOf(profile, e);
   const label = fitLabel(fit.score);
   return (
-    <button onClick={() => onOpen(e.id)} className="flex w-full items-center gap-3 border-b border-line bg-surface px-4 py-3 text-left hover:bg-surface-2">
+    <button
+      onClick={() => onOpen(e.id)}
+      className="relative mx-4 mb-2 flex w-[calc(100%-2rem)] items-center gap-3 overflow-hidden rounded-xl border border-line bg-surface py-3.5 pr-3 pl-5 text-left shadow-[0_1px_2px_rgb(23_32_42/0.04)] hover:bg-surface-2"
+    >
+      <span className={clsx('absolute inset-y-0 left-0 w-1.5', STRIP[e.status])} aria-hidden />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className={clsx('truncate text-[14.5px]', e.status === 'new' && !e.seenAt ? 'font-bold' : 'font-semibold')}>{e.name}</p>
+          <p className={clsx('truncate text-[15.5px]', e.status === 'new' && !e.seenAt ? 'font-bold' : 'font-semibold')}>{e.name}</p>
           <Badge tone={STATUS[e.status].tone}>{STATUS[e.status].label}</Badge>
         </div>
-        <p className="mt-0.5 truncate text-[12.5px] text-ink-2">
+        <p className="mt-0.5 truncate text-[13px] text-ink-2">
           {e.jobLabel} · {e.postcode} · {e.quote ? aud(e.quote.amount) : range(estimateOf(profile, e))}
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -209,8 +226,26 @@ function Row({ e, onOpen, extra }: { e: RealEnquiry; onOpen: (id: string) => voi
   );
 }
 
-function Heading({ children }: { children: ReactNode }) {
-  return <p className="px-4 pt-5 pb-1.5 text-[11.5px] font-semibold tracking-wide text-ink-3 uppercase">{children}</p>;
+/** The coloured edge on each card: orange needs you, navy is waiting, green is won. */
+const STRIP: Record<RealEnquiry['status'], string> = {
+  new: 'bg-accent',
+  visit_booked: 'bg-accent',
+  ballpark: 'bg-line-strong',
+  visit_offered: 'bg-line-strong',
+  quoted: 'bg-navy',
+  won: 'bg-good',
+  lost: 'bg-line',
+  declined: 'bg-line',
+};
+
+function Heading({ children, count, icon }: { children: ReactNode; count?: number; icon?: ReactNode }) {
+  return (
+    <h2 className="flex items-center gap-2 px-4 pt-5 pb-2 text-[16px] font-bold text-ink">
+      {icon && <span className="text-accent">{icon}</span>}
+      {children}
+      {count !== undefined && <span className="grid min-w-6 place-items-center rounded-full bg-accent px-1.5 text-[12px] font-bold text-white">{count}</span>}
+    </h2>
+  );
 }
 
 function Today({ onOpen }: { onOpen: (id: string) => void }) {
@@ -243,7 +278,7 @@ function Today({ onOpen }: { onOpen: (id: string) => void }) {
       ) : null}
       {fresh.length > 0 && (
         <>
-          <Heading>New enquiries ({fresh.length})</Heading>
+          <Heading count={fresh.length} icon={<Inbox className="size-5" />}>New enquiries</Heading>
           {fresh.map((e) => (
             <Row key={e.id} e={e} onOpen={onOpen} />
           ))}
@@ -251,7 +286,7 @@ function Today({ onOpen }: { onOpen: (id: string) => void }) {
       )}
       {toQuote.length > 0 && (
         <>
-          <Heading>Quotes to send ({toQuote.length})</Heading>
+          <Heading count={toQuote.length} icon={<MessageSquare className="size-5" />}>Quotes to send</Heading>
           {toQuote.map((e) => (
             <Row key={e.id} e={e} onOpen={onOpen} />
           ))}
@@ -259,7 +294,7 @@ function Today({ onOpen }: { onOpen: (id: string) => void }) {
       )}
       {due.length > 0 && (
         <>
-          <Heading>Follow-ups due ({due.length})</Heading>
+          <Heading count={due.length} icon={<Clock className="size-5" />}>Follow-ups due</Heading>
           <div className="space-y-2 px-4">
             {due.map(({ e, f }) => (
               <FollowUpCard key={`${e.id}-${f.n}`} e={e} n={f.n} compact />

@@ -12,7 +12,8 @@ const QuotePage = lazy(() => import('./real/QuotePage'));
 function useHash() {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
-    const on = () => (setHash(location.hash), window.scrollTo(0, 0));
+    // Pages that need their own title (a business name) set it again once they load.
+    const on = () => (setHash(location.hash), window.scrollTo(0, 0), (document.title = 'QuoteDesk'));
     addEventListener('hashchange', on);
     return () => removeEventListener('hashchange', on);
   }, []);

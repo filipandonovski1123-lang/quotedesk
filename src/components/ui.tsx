@@ -11,13 +11,14 @@ export function Button({
     <button
       {...rest}
       className={clsx(
-        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:cursor-not-allowed disabled:opacity-50',
-        size === 'sm' ? 'h-8 px-3 text-[13px]' : 'h-10 px-4 text-sm',
+        // Big, clearly labelled targets: 48px for main actions, so they work one-handed with work gloves off.
+        'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:cursor-not-allowed disabled:opacity-50',
+        size === 'sm' ? 'h-10 px-3.5 text-[13.5px]' : 'h-12 px-5 text-[15px]',
         variant === 'primary' && 'bg-navy text-white hover:bg-ink',
         variant === 'accent' && 'bg-accent text-white hover:brightness-95',
-        variant === 'secondary' && 'border border-line bg-surface text-ink hover:bg-surface-2',
+        variant === 'secondary' && 'border border-line-strong bg-surface text-ink hover:bg-surface-2',
         variant === 'ghost' && 'text-ink-2 hover:bg-surface-2 hover:text-ink',
-        variant === 'danger' && 'border border-line bg-surface text-bad hover:bg-bad-soft',
+        variant === 'danger' && 'border border-line-strong bg-surface text-bad hover:bg-bad-soft',
         className,
       )}
     />
@@ -59,7 +60,8 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 export const inputCls =
-  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-navy focus:ring-2 focus:ring-navy/15';
+  // 16px text stops iPhones zooming in on every field; 48px tall for easy tapping.
+  'w-full min-h-12 rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-[16px] text-ink outline-none placeholder:text-ink-3/80 focus:border-navy focus:ring-2 focus:ring-navy/15';
 
 /** A phone-shaped frame on wide screens; plain full-width on phones. */
 export function Phone({ label, children }: { label: string; children: ReactNode }) {
