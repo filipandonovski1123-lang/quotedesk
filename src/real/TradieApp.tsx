@@ -1,9 +1,9 @@
 import clsx from 'clsx';
 import type { User } from 'firebase/auth';
 import { BarChart3, CalendarClock, CalendarDays, FileText, HardHat, Inbox, Loader2, Plus, Settings as Cog, Wrench } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Badge, Card, Stat } from '../components/ui';
-import { AppHeader, ListCard, ListRow, SectionTitle, StatusLine, TabBar, Thumb } from '../components/worksite';
+import { AppHeader, ListCard, ListRow, SectionTitle, Sidebar, StatusLine, TabBar, Thumb, type TabItem } from '../components/worksite';
 import { aud, fitLabel, range } from '../lib/pricing';
 import { loadFirstPhoto, saveProfile, updateEnquiry, watchAuth, watchEnquiries, watchMyQuotes, watchProfile } from './api';
 import { AuthScreen } from './app/Auth';
@@ -129,23 +129,41 @@ function useAlerts(enquiries: RealEnquiry[] | null, quotes: PublicQuote[]) {
 
 type Tab = 'today' | 'enquiries' | 'quotes' | 'results' | 'settings';
 
-function Main() {
+function useWide() {
+  // Computers and landscape tablets: list on the left, the open enquiry on the right.
+  const q = '(min-width: 1024px)';
+  return useSyncExternalStore(
+    (cb) => {
+      const m = matchMedia(q);
+      m.addEventListener('change', cb);
+      return () => m.removeEventListener('change', cb);
+    },
+    () => matchMedia(q).matches,
+  );
+}
+
+/** The enquiry open in the side panel, so its row can show as selected. */
+const Selected = createContext<string | null>(null);
+
+export { Main as TradieMain };
+
+function Main({ start }: { start?: { tab?: Tab; open?: string } }) {
   const { enquiries, now, profile } = useApp();
-  const [tab, setTab] = useState<Tab>('today');
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>(start?.tab ?? 'today');
+  const [openId, setOpenId] = useState<string | null>(start?.open ?? null);
+  const wide = useWide();
   const open = enquiries.find((e) => e.id === openId);
   const todo = enquiries.filter((e) => e.status === 'new' || e.status === 'visit_booked').length + dueFollowUps(enquiries, now).length;
+  const listTab = tab === 'today' || tab === 'enquiries' || tab === 'quotes';
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [openId, tab]);
+    if (!wide) window.scrollTo(0, 0);
+  }, [openId, tab, wide]);
 
-  if (open)
-    return (
-      <div className="mx-auto max-w-lg bg-surface">
-        <Detail e={open} onBack={() => setOpenId(null)} />
-      </div>
-    );
+  const go = (t: Tab) => {
+    setTab(t);
+    if (!wide || !(t === 'today' || t === 'enquiries' || t === 'quotes')) setOpenId(null);
+  };
 
   const titles: Record<Tab, string> = { today: 'Today', enquiries: 'Enquiries', quotes: 'Quotes out', results: 'Results', settings: 'Settings' };
   const subtitle: Record<Tab, string> = {
@@ -155,28 +173,77 @@ function Main() {
     results: 'What QuoteDesk has done for you',
     settings: profile.business,
   };
+  const items: TabItem<Tab>[] = [
+    { id: 'today', icon: <CalendarDays className="size-6" />, label: 'Today', count: todo },
+    { id: 'enquiries', icon: <Inbox className="size-6" />, label: 'Enquiries' },
+    { id: 'quotes', icon: <FileText className="size-6" />, label: 'Quotes' },
+    { id: 'results', icon: <BarChart3 className="size-6" />, label: 'Results' },
+    { id: 'settings', icon: <Cog className="size-6" />, label: 'Settings' },
+  ];
+
+  const page = (
+    <>
+      {tab === 'today' && <Today onOpen={setOpenId} />}
+      {tab === 'enquiries' && <AllEnquiries onOpen={setOpenId} />}
+      {tab === 'quotes' && <Quotes onOpen={setOpenId} />}
+      {tab === 'results' && <Results />}
+      {tab === 'settings' && <Settings />}
+    </>
+  );
+
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-bg">
-      <AppHeader title={titles[tab]} subtitle={subtitle[tab]} compact={tab !== 'today'} right={tab === 'today' ? undefined : <span />} />
-      <div className="flex-1 pb-28">
-        {tab === 'today' && <Today onOpen={setOpenId} />}
-        {tab === 'enquiries' && <AllEnquiries onOpen={setOpenId} />}
-        {tab === 'quotes' && <Quotes onOpen={setOpenId} />}
-        {tab === 'results' && <Results />}
-        {tab === 'settings' && <Settings />}
+    <Selected.Provider value={wide ? openId : null}>
+      <div className="min-h-dvh bg-bg md:flex">
+        <Sidebar
+          items={items}
+          active={tab}
+          onChange={go}
+          footer={
+            <div className="rounded-xl bg-white/[0.07] p-3">
+              <p className="truncate text-[14px] font-bold">{profile.business}</p>
+              <a href={`#/q/${profile.slug}`} target="_blank" rel="noopener noreferrer" className="mt-0.5 block truncate text-[12.5px] text-white/70 hover:text-white hover:underline">
+                Your enquiry page ↗
+              </a>
+            </div>
+          }
+        />
+        <div className="min-w-0 flex-1">
+          {open && !wide ? (
+            <div className="mx-auto max-w-3xl bg-surface">
+              <Detail e={open} onBack={() => setOpenId(null)} />
+            </div>
+          ) : listTab && wide ? (
+            <div className="flex h-dvh">
+              <div className="w-[420px] shrink-0 overflow-y-auto border-r border-line pb-8 xl:w-[460px]">
+                <AppHeader title={titles[tab]} subtitle={subtitle[tab]} wide right={<span />} />
+                {page}
+              </div>
+              <div className="min-w-0 flex-1 overflow-y-auto bg-surface">
+                {open ? (
+                  <div className="mx-auto max-w-3xl">
+                    <Detail key={open.id} e={open} onBack={() => setOpenId(null)} />
+                  </div>
+                ) : (
+                  <div className="grid h-full place-items-center p-8 text-center">
+                    <div>
+                      <Inbox className="mx-auto size-12 text-line-strong" strokeWidth={1.5} />
+                      <p className="mt-3 font-display text-[24px] font-bold">Pick an enquiry</p>
+                      <p className="mt-1 text-[14px] text-ink-2">Its photos, price guide and reply buttons show here.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className={clsx('mx-auto pb-28 md:pb-10', listTab ? 'max-w-3xl' : 'max-w-5xl')}>
+              <AppHeader title={titles[tab]} subtitle={subtitle[tab]} compact={tab !== 'today'} right={tab === 'today' ? undefined : <span />} wide />
+              <div className="md:px-2 lg:px-4">{page}</div>
+            </div>
+          )}
+        </div>
+        {!(open && !wide) && <TabBar className="md:hidden" active={tab} onChange={go} items={items} />}
       </div>
-      <TabBar
-        active={tab}
-        onChange={setTab}
-        items={[
-          { id: 'today', icon: <CalendarDays className="size-6" />, label: 'Today', count: todo },
-          { id: 'enquiries', icon: <Inbox className="size-6" />, label: 'Enquiries' },
-          { id: 'quotes', icon: <FileText className="size-6" />, label: 'Quotes' },
-          { id: 'results', icon: <BarChart3 className="size-6" />, label: 'Results' },
-          { id: 'settings', icon: <Cog className="size-6" />, label: 'Settings' },
-        ]}
-      />
-    </div>
+    </Selected.Provider>
   );
 }
 
@@ -207,8 +274,10 @@ function Row({ e, onOpen, extra }: { e: RealEnquiry; onOpen: (id: string) => voi
   const label = fitLabel(fit.score);
   const est = estimateOf(profile, e);
   const money = e.quote ? aud(e.quote.amount) : est ? range(est) : null;
+  const selected = useContext(Selected) === e.id;
   return (
     <ListRow
+      active={selected}
       onClick={() => onOpen(e.id)}
       thumb={<EnquiryThumb e={e} />}
       title={
@@ -372,7 +441,7 @@ function Quotes({ onOpen }: { onOpen: (id: string) => void }) {
       <div className="p-4">
         <Card className="p-3">
           <p className="text-[12px] text-ink-3">Open quotes</p>
-          <p className="text-[24px] font-semibold tabular-nums">{aud(total)}</p>
+          <p className="font-display text-[34px] leading-none font-bold tabular-nums">{aud(total)}</p>
           <p className="text-[12.5px] text-ink-2">
             {out.length} quote{out.length === 1 ? '' : 's'} waiting on an answer. Follow-ups show up on Today when they’re due.
           </p>
@@ -415,12 +484,12 @@ function Results() {
     <div className="space-y-3 p-4">
       <Card className="border-navy bg-navy p-4 text-white">
         <p className="text-[12.5px] text-white/70">Won after a follow-up</p>
-        <p className="text-[30px] font-semibold tabular-nums">{aud(r.wonBackValue)}</p>
+        <p className="mt-1 font-display text-[44px] leading-none font-bold tabular-nums">{aud(r.wonBackValue)}</p>
         <p className="text-[13px] text-white/80">
           {r.wonBack} job{r.wonBack === 1 ? '' : 's'} said yes after a follow-up. Without one, many of these quotes would have gone quiet.
         </p>
       </Card>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <Stat label="Enquiries" value={r.enquiries} />
         <Stat label="Site visits avoided" value={r.avoided} sub="Answered without driving out" />
         <Stat label="Hours saved" value={r.hoursSaved.toFixed(1)} sub="Estimate" />

@@ -49,7 +49,7 @@ export function Detail({ e, onBack }: { e: RealEnquiry; onBack: () => void }) {
         </a>
       </header>
       <Photos e={e} />
-      <div className="flex-1 space-y-3 p-3 pb-10">
+      <div className="flex-1 space-y-3 p-3 pb-10 md:p-5">
         <Summary e={e} />
         <Actions e={e} />
         <Facts e={e} />
@@ -326,12 +326,12 @@ function Photos({ e }: { e: RealEnquiry }) {
       <div className={clsx('grid gap-1.5 bg-surface p-2', shown.length === 1 ? 'grid-cols-1' : shown.length === 2 ? 'grid-cols-2' : 'grid-cols-[2fr_1fr_1fr]')} aria-label={`${e.photoCount} photos from ${e.name}`}>
         {shown.map((src, i) =>
           src ? (
-            <button key={i} onClick={() => setBig(i)} aria-label={`Open photo ${i + 1}`} className="relative h-36 overflow-hidden rounded-xl">
+            <button key={i} onClick={() => setBig(i)} aria-label={`Open photo ${i + 1}`} className="relative h-36 overflow-hidden rounded-xl md:h-60">
               <img src={src} alt={`Photo ${i + 1} from ${e.name}`} className="size-full object-cover" />
               {i === shown.length - 1 && more > 0 && <span className="absolute inset-0 grid place-items-center bg-ink/55 font-display text-[28px] font-bold text-white">+{more}</span>}
             </button>
           ) : (
-            <div key={i} className="h-36 animate-pulse rounded-xl bg-surface-2" />
+            <div key={i} className="h-36 animate-pulse rounded-xl bg-surface-2 md:h-60" />
           ),
         )}
       </div>

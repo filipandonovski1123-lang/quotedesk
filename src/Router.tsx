@@ -8,6 +8,7 @@ const DemoShell = lazy(() => import('./App'));
 const TradieApp = lazy(() => import('./real/TradieApp'));
 const EnquiryPage = lazy(() => import('./real/EnquiryPage'));
 const QuotePage = lazy(() => import('./real/QuotePage'));
+const DevPreview = import.meta.env.DEV ? lazy(() => import('./real/DevPreview')) : null;
 
 function useHash() {
   const [hash, setHash] = useState(location.hash);
@@ -28,6 +29,7 @@ export function Router() {
   else if (first === 'app') page = <TradieApp />;
   else if (first === 'q' && second) page = <EnquiryPage slug={decodeURIComponent(second)} />;
   else if (first === 'quote' && second) page = <QuotePage token={second} />;
+  else if (DevPreview && (first === 'dev-app' || first === 'dev-quote')) page = <DevPreview page={first === 'dev-app' ? 'app' : 'quote'} arg={second} />;
   else if (first === 'privacy') page = <Privacy />;
   else if (first === 'terms') page = <Terms />;
   else page = <Landing />;

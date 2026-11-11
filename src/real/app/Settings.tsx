@@ -38,7 +38,7 @@ export function Settings() {
   };
 
   return (
-    <div className="space-y-4 p-4 pb-28">
+    <div className="space-y-4 p-4 pb-28 md:pb-24 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
       <LinkCard profile={profile} />
 
       <Section title="Your business">
@@ -152,7 +152,7 @@ export function Settings() {
       </Section>
 
       {(dirty || msg) && (
-        <div className="fixed inset-x-0 bottom-16 z-20 mx-auto flex max-w-lg items-center gap-2 border-t border-line bg-surface px-4 py-2.5 shadow-lg">
+        <div className="fixed inset-x-0 bottom-16 z-20 mx-auto flex max-w-lg items-center gap-2 border-t border-line bg-surface px-4 py-2.5 shadow-lg md:bottom-4 md:left-60 md:max-w-xl md:rounded-xl md:border lg:left-64">
           <p className="flex-1 text-[13px] text-ink-2">{dirty ? 'You have unsaved changes.' : msg}</p>
           {dirty && (
             <>

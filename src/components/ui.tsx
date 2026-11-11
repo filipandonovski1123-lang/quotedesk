@@ -77,9 +77,9 @@ export function Phone({ label, children }: { label: string; children: ReactNode 
 
 export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-3">
+    <div className="rounded-2xl border border-line bg-surface p-3.5">
       <p className="text-[12px] text-ink-3">{label}</p>
-      <p className="mt-0.5 text-[22px] leading-tight font-semibold tabular-nums">{value}</p>
+      <p className="mt-1 font-display text-[30px] leading-none font-bold tabular-nums">{value}</p>
       {sub && <p className="mt-0.5 text-[12px] text-ink-2">{sub}</p>}
     </div>
   );

@@ -21,18 +21,19 @@ const items = (notes: string) =>
  * The page a customer opens from the quote text. It should feel like it comes from a reputable
  * local business: their name up top, the total and what's included, one obvious Accept button.
  */
-export default function QuotePage({ token }: { token: string }) {
-  const [q, setQ] = useState<PublicQuote | null | 'loading'>('loading');
+export default function QuotePage({ token, preview }: { token: string; preview?: PublicQuote }) {
+  const [q, setQ] = useState<PublicQuote | null | 'loading'>(preview ?? 'loading');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
+    if (preview) return;
     loadQuote(token)
       .then((x) => {
         setQ(x);
         if (x) document.title = `Your quote from ${x.business}`;
       })
       .catch(() => setQ(null));
-  }, [token]);
+  }, [token, preview]);
 
   const respond = async (status: 'accepted' | 'declined') => {
     if (q === 'loading' || !q) return;
@@ -40,7 +41,7 @@ export default function QuotePage({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      await respondToQuote(token, status);
+      if (!preview) await respondToQuote(token, status);
       setQ({ ...q, status });
     } catch {
       setError('That didn’t go through. Check your connection and try again.');
