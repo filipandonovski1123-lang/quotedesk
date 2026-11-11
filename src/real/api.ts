@@ -139,6 +139,19 @@ export async function loadPhotos(uid: string, id: string): Promise<string[]> {
   return s.docs.sort((a, b) => Number(a.id) - Number(b.id)).map((d) => String(d.data().data ?? ''));
 }
 
+const firstPhotos = new Map<string, Promise<string | null>>();
+/** Just the first photo, for list thumbnails. Cached for the session. */
+export function loadFirstPhoto(uid: string, id: string): Promise<string | null> {
+  if (!firstPhotos.has(id))
+    firstPhotos.set(
+      id,
+      getDoc(doc(db, 'tradies', uid, 'enquiries', id, 'photos', '0'))
+        .then((d) => (d.exists() ? String(d.data().data ?? '') || null : null))
+        .catch(() => null),
+    );
+  return firstPhotos.get(id)!;
+}
+
 export function updateEnquiry(uid: string, id: string, patch: Partial<RealEnquiry>) {
   const { id: _id, createdMs: _c, ...rest } = patch;
   void _id;

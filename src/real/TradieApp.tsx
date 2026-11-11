@@ -1,14 +1,15 @@
 import clsx from 'clsx';
 import type { User } from 'firebase/auth';
-import { BarChart3, ChevronRight, Clock, Home, Inbox, Loader2, MessageSquare, Plus, Settings as Cog } from 'lucide-react';
+import { BarChart3, CalendarClock, CalendarDays, FileText, HardHat, Inbox, Loader2, Plus, Settings as Cog, Wrench } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Badge, Card, Stat } from '../components/ui';
+import { AppHeader, ListCard, ListRow, SectionTitle, StatusLine, TabBar, Thumb } from '../components/worksite';
 import { aud, fitLabel, range } from '../lib/pricing';
-import { saveProfile, updateEnquiry, watchAuth, watchEnquiries, watchMyQuotes, watchProfile } from './api';
+import { loadFirstPhoto, saveProfile, updateEnquiry, watchAuth, watchEnquiries, watchMyQuotes, watchProfile } from './api';
 import { AuthScreen } from './app/Auth';
 import { refreshPush } from './push';
 import { Ctx, useApp, type AppData } from './app/ctx';
-import { Detail, FollowUpCard, STATUS } from './app/Detail';
+import { Detail, FollowUpCard } from './app/Detail';
 import { Onboarding } from './app/Onboarding';
 import { LinkCard, Settings } from './app/Settings';
 import { ago, dueFollowUps, estimateOf, fitOf, realResults, when } from './logic';
@@ -148,7 +149,7 @@ function Main() {
 
   const titles: Record<Tab, string> = { today: 'Today', enquiries: 'Enquiries', quotes: 'Quotes out', results: 'Results', settings: 'Settings' };
   const subtitle: Record<Tab, string> = {
-    today: todo ? `${todo} thing${todo === 1 ? '' : 's'} to do` : 'Nothing waiting on you',
+    today: todo ? 'What to do next' : 'Nothing waiting on you',
     enquiries: 'Everyone who’s asked for a price',
     quotes: 'Waiting on an answer',
     results: 'What QuoteDesk has done for you',
@@ -156,95 +157,79 @@ function Main() {
   };
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-bg">
-      <header className="sticky top-0 z-10 bg-navy px-4 pt-4 pb-3.5 text-white">
-        <h1 className="text-[22px] leading-tight font-bold">{titles[tab]}</h1>
-        <p className="mt-0.5 text-[13px] text-white/75">{subtitle[tab]}</p>
-      </header>
-      <div className="flex-1 pb-24">
+      <AppHeader title={titles[tab]} subtitle={subtitle[tab]} compact={tab !== 'today'} right={tab === 'today' ? undefined : <span />} />
+      <div className="flex-1 pb-28">
         {tab === 'today' && <Today onOpen={setOpenId} />}
         {tab === 'enquiries' && <AllEnquiries onOpen={setOpenId} />}
         {tab === 'quotes' && <Quotes onOpen={setOpenId} />}
         {tab === 'results' && <Results />}
         {tab === 'settings' && <Settings />}
       </div>
-      <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto grid max-w-lg grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]" aria-label="QuoteDesk">
-        <TabBtn icon={<Home className="size-5" />} label="Today" active={tab === 'today'} onClick={() => setTab('today')} count={todo} />
-        <TabBtn icon={<Inbox className="size-5" />} label="Enquiries" active={tab === 'enquiries'} onClick={() => setTab('enquiries')} />
-        <TabBtn icon={<MessageSquare className="size-5" />} label="Quotes" active={tab === 'quotes'} onClick={() => setTab('quotes')} />
-        <TabBtn icon={<BarChart3 className="size-5" />} label="Results" active={tab === 'results'} onClick={() => setTab('results')} />
-        <TabBtn icon={<Cog className="size-5" />} label="Settings" active={tab === 'settings'} onClick={() => setTab('settings')} />
-      </nav>
+      <TabBar
+        active={tab}
+        onChange={setTab}
+        items={[
+          { id: 'today', icon: <CalendarDays className="size-6" />, label: 'Today', count: todo },
+          { id: 'enquiries', icon: <Inbox className="size-6" />, label: 'Enquiries' },
+          { id: 'quotes', icon: <FileText className="size-6" />, label: 'Quotes' },
+          { id: 'results', icon: <BarChart3 className="size-6" />, label: 'Results' },
+          { id: 'settings', icon: <Cog className="size-6" />, label: 'Settings' },
+        ]}
+      />
     </div>
   );
 }
 
-function TabBtn({ icon, label, active, onClick, count }: { icon: ReactNode; label: string; active: boolean; onClick: () => void; count?: number }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-current={active ? 'page' : undefined}
-      className={clsx('relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11.5px]', active ? 'font-bold text-navy' : 'font-medium text-ink-3')}
-    >
-      {active && <span className="absolute inset-x-3 top-0 h-[3px] rounded-b bg-navy" aria-hidden />}
-      {icon}
-      {label}
-      {!!count && <span className="absolute top-1.5 right-[calc(50%-22px)] grid min-w-5 place-items-center rounded-full bg-accent px-1 text-[11px] font-bold text-white">{count}</span>}
-    </button>
-  );
+/** What each status reads as in a list, and its colour. */
+const LINE: Record<RealEnquiry['status'], { text: string; tone: 'accent' | 'navy' | 'good' | 'muted' }> = {
+  new: { text: 'New', tone: 'accent' },
+  visit_booked: { text: 'Quote due', tone: 'accent' },
+  ballpark: { text: 'Ballpark sent', tone: 'muted' },
+  visit_offered: { text: 'Visit offered', tone: 'muted' },
+  quoted: { text: 'Quoted', tone: 'navy' },
+  won: { text: 'Won', tone: 'good' },
+  lost: { text: 'Lost', tone: 'muted' },
+  declined: { text: 'Declined', tone: 'muted' },
+};
+
+function EnquiryThumb({ e }: { e: RealEnquiry }) {
+  const { user } = useApp();
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (e.photoCount) void loadFirstPhoto(user.uid, e.id).then(setSrc);
+  }, [e.id, e.photoCount, user.uid]);
+  return <Thumb src={src} count={e.photoCount} icon={<Wrench />} />;
 }
 
 function Row({ e, onOpen, extra }: { e: RealEnquiry; onOpen: (id: string) => void; extra?: ReactNode }) {
   const { profile } = useApp();
   const fit = fitOf(profile, e);
   const label = fitLabel(fit.score);
+  const est = estimateOf(profile, e);
+  const money = e.quote ? aud(e.quote.amount) : est ? range(est) : null;
   return (
-    <button
+    <ListRow
       onClick={() => onOpen(e.id)}
-      className="relative mx-4 mb-2 flex w-[calc(100%-2rem)] items-center gap-3 overflow-hidden rounded-xl border border-line bg-surface py-3.5 pr-3 pl-5 text-left shadow-[0_1px_2px_rgb(23_32_42/0.04)] hover:bg-surface-2"
-    >
-      <span className={clsx('absolute inset-y-0 left-0 w-1.5', STRIP[e.status])} aria-hidden />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className={clsx('truncate text-[15.5px]', e.status === 'new' && !e.seenAt ? 'font-bold' : 'font-semibold')}>{e.name}</p>
-          <Badge tone={STATUS[e.status].tone}>{STATUS[e.status].label}</Badge>
-        </div>
-        <p className="mt-0.5 truncate text-[13px] text-ink-2">
-          {e.jobLabel} · {e.postcode} · {e.quote ? aud(e.quote.amount) : range(estimateOf(profile, e))}
-        </p>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          {e.status === 'new' && (
-            <Badge tone={label.tone}>
-              {label.label} · {fit.score}
-            </Badge>
-          )}
-          <span className="text-[11.5px] text-ink-3">{ago(e.createdMs)}</span>
-          {extra}
-        </div>
-      </div>
-      <ChevronRight className="size-4 shrink-0 text-ink-3" />
-    </button>
-  );
-}
-
-/** The coloured edge on each card: orange needs you, navy is waiting, green is won. */
-const STRIP: Record<RealEnquiry['status'], string> = {
-  new: 'bg-accent',
-  visit_booked: 'bg-accent',
-  ballpark: 'bg-line-strong',
-  visit_offered: 'bg-line-strong',
-  quoted: 'bg-navy',
-  won: 'bg-good',
-  lost: 'bg-line',
-  declined: 'bg-line',
-};
-
-function Heading({ children, count, icon }: { children: ReactNode; count?: number; icon?: ReactNode }) {
-  return (
-    <h2 className="flex items-center gap-2 px-4 pt-5 pb-2 text-[16px] font-bold text-ink">
-      {icon && <span className="text-accent">{icon}</span>}
-      {children}
-      {count !== undefined && <span className="grid min-w-6 place-items-center rounded-full bg-accent px-1.5 text-[12px] font-bold text-white">{count}</span>}
-    </h2>
+      thumb={<EnquiryThumb e={e} />}
+      title={
+        <>
+          {e.jobLabel} <span className="font-medium text-ink-2">– {e.name}</span>
+        </>
+      }
+      sub={<StatusLine status={LINE[e.status].text} tone={LINE[e.status].tone} rest={[e.postcode, money, ago(e.createdMs)].filter(Boolean).join(' · ')} />}
+      extra={
+        e.status === 'new' || extra ? (
+          <>
+            {e.status === 'new' && (
+              <Badge tone={label.tone}>
+                {label.label} · {fit.score}%
+              </Badge>
+            )}
+            {extra}
+          </>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -254,14 +239,15 @@ function Today({ onOpen }: { onOpen: (id: string) => void }) {
   const toQuote = enquiries.filter((e) => e.status === 'visit_booked');
   const due = dueFollowUps(enquiries, now);
   const nothing = !fresh.length && !toQuote.length && !due.length;
+  const [openFollow, setOpenFollow] = useState<string | null>(null);
   return (
     <>
       {enquiries.length === 0 ? (
         <div className="space-y-3 p-4">
           <LinkCard profile={profile} />
-          <Card className="p-4">
-            <p className="text-[15px] font-semibold">Get your first enquiry</p>
-            <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-[13.5px] text-ink-2">
+          <Card className="rounded-2xl p-4">
+            <p className="font-display text-[22px] font-bold">Get your first enquiry</p>
+            <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-[14px] text-ink-2">
               <li>Check your prices in Settings, so the price guides are right.</li>
               <li>Open your link and send yourself a test enquiry to see how it works.</li>
               <li>Add the link to your website, Google profile, and your “sorry I missed your call” text.</li>
@@ -270,36 +256,62 @@ function Today({ onOpen }: { onOpen: (id: string) => void }) {
         </div>
       ) : nothing ? (
         <div className="p-4">
-          <Card className="p-4">
-            <p className="text-[15px] font-semibold">All caught up</p>
-            <p className="mt-1 text-[13.5px] text-ink-2">No new enquiries, quotes to write or follow-ups due. Next follow-up: {nextDue(enquiries, now)}.</p>
+          <Card className="rounded-2xl p-4">
+            <p className="font-display text-[22px] font-bold">All caught up</p>
+            <p className="mt-1 text-[14px] text-ink-2">No new enquiries, quotes to write or follow-ups due. Next follow-up: {nextDue(enquiries, now)}.</p>
           </Card>
         </div>
       ) : null}
       {fresh.length > 0 && (
         <>
-          <Heading count={fresh.length} icon={<Inbox className="size-5" />}>New enquiries</Heading>
-          {fresh.map((e) => (
-            <Row key={e.id} e={e} onOpen={onOpen} />
-          ))}
+          <SectionTitle icon={<HardHat />}>
+            {fresh.length} new enquir{fresh.length === 1 ? 'y' : 'ies'}
+          </SectionTitle>
+          <ListCard>
+            {fresh.map((e) => (
+              <Row key={e.id} e={e} onOpen={onOpen} />
+            ))}
+          </ListCard>
         </>
       )}
       {toQuote.length > 0 && (
         <>
-          <Heading count={toQuote.length} icon={<MessageSquare className="size-5" />}>Quotes to send</Heading>
-          {toQuote.map((e) => (
-            <Row key={e.id} e={e} onOpen={onOpen} />
-          ))}
+          <SectionTitle icon={<FileText />} count={toQuote.length}>
+            Quotes to send
+          </SectionTitle>
+          <ListCard>
+            {toQuote.map((e) => (
+              <Row key={e.id} e={e} onOpen={onOpen} />
+            ))}
+          </ListCard>
         </>
       )}
       {due.length > 0 && (
         <>
-          <Heading count={due.length} icon={<Clock className="size-5" />}>Follow-ups due</Heading>
-          <div className="space-y-2 px-4">
-            {due.map(({ e, f }) => (
-              <FollowUpCard key={`${e.id}-${f.n}`} e={e} n={f.n} compact />
-            ))}
-          </div>
+          <SectionTitle icon={<CalendarClock />} count={due.length}>
+            Follow-ups due
+          </SectionTitle>
+          <ListCard>
+            {due.map(({ e, f }) => {
+              const key = `${e.id}-${f.n}`;
+              return openFollow === key ? (
+                <div key={key} className="p-2">
+                  <FollowUpCard e={e} n={f.n} compact />
+                  <button className="mt-1 px-1 py-2 text-[13px] text-ink-3 hover:underline" onClick={() => setOpenFollow(null)}>
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <ListRow
+                  key={key}
+                  onClick={() => setOpenFollow(key)}
+                  thumb={<Thumb icon={<CalendarClock />} />}
+                  title={`Day ${profile.followUpDays[f.n - 1]} follow-up`}
+                  sub={`${e.name} – ${e.jobLabel} · ${aud(e.quote?.amount ?? 0)}`}
+                />
+              );
+            })}
+          </ListCard>
         </>
       )}
     </>
@@ -337,7 +349,15 @@ function AllEnquiries({ onOpen }: { onOpen: (id: string) => void }) {
         ))}
       </div>
       <div className="mt-3">
-        {list.length ? list.map((e) => <Row key={e.id} e={e} onOpen={onOpen} />) : <p className="px-4 py-6 text-center text-[13.5px] text-ink-3">Nothing here yet.</p>}
+        {list.length ? (
+          <ListCard>
+            {list.map((e) => (
+              <Row key={e.id} e={e} onOpen={onOpen} />
+            ))}
+          </ListCard>
+        ) : (
+          <p className="px-4 py-6 text-center text-[13.5px] text-ink-3">Nothing here yet.</p>
+        )}
       </div>
     </>
   );
@@ -359,7 +379,8 @@ function Quotes({ onOpen }: { onOpen: (id: string) => void }) {
         </Card>
       </div>
       {out.length ? (
-        out.map((e) => {
+        <ListCard>
+        {out.map((e) => {
           const next = e.followUps.find((f) => f.status === 'scheduled');
           return (
             <Row
@@ -378,7 +399,8 @@ function Quotes({ onOpen }: { onOpen: (id: string) => void }) {
               }
             />
           );
-        })
+        })}
+        </ListCard>
       ) : (
         <p className="px-4 py-6 text-center text-[13.5px] text-ink-3">No quotes out. Send one from an enquiry after the site visit.</p>
       )}

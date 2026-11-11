@@ -1,5 +1,6 @@
 import clsx from 'clsx';
-import { ArrowLeft, Check, Clock, ExternalLink, MessageSquare, Phone, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, Clock, ExternalLink, FileText, MapPin, MessageSquare, Phone, Trash2, X } from 'lucide-react';
+import { PriceFit } from '../../components/worksite';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Badge, Button, Card, Field, inputCls } from '../../components/ui';
 import { aud, fitLabel, jobOf, range, suggestAction, type Suggestion } from '../../lib/pricing';
@@ -23,22 +24,21 @@ export const STATUS: Record<RealStatus, { label: string; tone: 'good' | 'mid' | 
 const log = (e: RealEnquiry, kind: LogEntry['kind'], text: string): LogEntry[] => [...(e.log ?? []), { at: Date.now(), kind, text }];
 
 export function Detail({ e, onBack }: { e: RealEnquiry; onBack: () => void }) {
-  const { user, profile } = useApp();
-  const job = jobOf(profile.trade, e.jobType, profile.customJobs);
+  const { user } = useApp();
   useEffect(() => {
     if (!e.seenAt) void updateEnquiry(user.uid, e.id, { seenAt: Date.now() }).catch(() => undefined);
   }, [e.id, e.seenAt, user.uid]);
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
-      <header className="sticky top-0 z-10 flex items-center gap-1 bg-navy px-1.5 py-2 text-white">
+      <header className="sticky top-0 z-10 flex items-center gap-1 bg-navy px-1.5 py-2.5 text-white">
         <button onClick={onBack} aria-label="Back" className="grid size-12 place-items-center rounded-xl hover:bg-white/10">
           <ArrowLeft className="size-5" />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[17px] font-bold">{e.name}</p>
+          <p className="truncate font-display text-[24px] leading-tight font-bold">{e.name}</p>
           <p className="truncate text-[12.5px] text-white/75">
-            {job.label} · {e.postcode} · {ago(e.createdMs)}
+            Enquiry · {ago(e.createdMs)}
           </p>
         </div>
         <a href={smsHref(e.phone, `Hi ${firstName(e.name)}, `)} className="grid size-12 place-items-center rounded-xl hover:bg-white/10" aria-label={`Text ${e.name}`}>
@@ -69,10 +69,10 @@ export function Detail({ e, onBack }: { e: RealEnquiry; onBack: () => void }) {
   );
 }
 
-const ACTIONS: Record<Suggestion, { label: string; desc: string; status: RealStatus; kind: LogEntry['kind'] }> = {
-  visit: { label: 'Offer a paid site visit', desc: 'Send the price guide and how to book a measure-up.', status: 'visit_offered', kind: 'visit' },
-  ballpark: { label: 'Send a ballpark', desc: 'Send the price guide first. They book a visit if it suits.', status: 'ballpark', kind: 'ballpark' },
-  decline: { label: 'Decline politely', desc: 'A kind no, without a drive or a phone call.', status: 'declined', kind: 'decline' },
+const ACTIONS: Record<Suggestion, { short: string; label: string; desc: string; status: RealStatus; kind: LogEntry['kind'] }> = {
+  visit: { short: 'offer a visit', label: 'Offer a paid site visit', desc: 'Send the price guide and how to book a measure-up.', status: 'visit_offered', kind: 'visit' },
+  ballpark: { short: 'send a ballpark', label: 'Send a ballpark', desc: 'Send the price guide first. They book a visit if it suits.', status: 'ballpark', kind: 'ballpark' },
+  decline: { short: 'decline politely', label: 'Decline politely', desc: 'A kind no, without a drive or a phone call.', status: 'declined', kind: 'decline' },
 };
 
 function Actions({ e }: { e: RealEnquiry }) {
@@ -122,19 +122,21 @@ function NewActions({ e }: { e: RealEnquiry }) {
   const [choice, setChoice] = useState<Suggestion | null>(null);
   return (
     <Card className="p-3">
-      <p className="text-[16px] font-bold">{choice ? ACTIONS[choice].label : 'How do you want to reply?'}</p>
+      <p className="font-display text-[22px] leading-tight font-bold">{choice ? ACTIONS[choice].label : 'Reply'}</p>
       {!est && !choice && <p className="mt-0.5 text-[12.5px] text-ink-3">Tip: set prices for “{e.jobLabel}” in Settings and every enquiry gets a price guide.</p>}
       {!choice ? (
         <div className="mt-3 space-y-2">
-          {(['visit', 'ballpark', 'decline'] as const).map((a) => (
-            <button key={a} onClick={() => setChoice(a)} className={clsx('min-h-14 w-full rounded-xl border-2 px-3.5 py-3 text-left hover:bg-surface-2', a === suggestion ? 'border-navy bg-navy/[0.04]' : 'border-line bg-surface')}>
-              <span className="flex items-center gap-2 text-[15px] font-bold">
+          <Button variant="accent" className="h-14 w-full text-[16px]" onClick={() => setChoice(suggestion)}>
+            <MessageSquare className="size-5" /> Reply by text
+          </Button>
+          <p className="px-1 pb-1 text-[13px] text-ink-2"><strong className="text-ink">Suggested: {ACTIONS[suggestion].short}.</strong> {ACTIONS[suggestion].desc}</p>
+          {(['visit', 'ballpark', 'decline'] as const)
+            .filter((a) => a !== suggestion)
+            .map((a) => (
+              <Button key={a} className="w-full" onClick={() => setChoice(a)}>
                 {ACTIONS[a].label}
-                {a === suggestion && <Badge tone="navy">Suggested</Badge>}
-              </span>
-              <span className="block text-[12.5px] text-ink-2">{ACTIONS[a].desc}</span>
-            </button>
-          ))}
+              </Button>
+            ))}
         </div>
       ) : (
         <div className="mt-3">
@@ -312,26 +314,45 @@ export function FollowUpCard({ e, n, compact }: { e: RealEnquiry; n: 1 | 2 | 3; 
 function Photos({ e }: { e: RealEnquiry }) {
   const { user } = useApp();
   const [photos, setPhotos] = useState<string[] | null>(e.photoCount ? null : []);
-  const [big, setBig] = useState<string | null>(null);
+  const [big, setBig] = useState<number | null>(null);
   useEffect(() => {
     if (e.photoCount) void loadPhotos(user.uid, e.id).then(setPhotos).catch(() => setPhotos([]));
   }, [e.id, e.photoCount, user.uid]);
   if (!e.photoCount) return null;
+  const shown = (photos ?? Array.from({ length: e.photoCount }, () => '')).slice(0, 3);
+  const more = e.photoCount - shown.length;
   return (
     <>
-      <div className="flex gap-1.5 overflow-x-auto bg-surface p-2" aria-label={`${e.photoCount} photos from ${e.name}`}>
-        {photos === null
-          ? Array.from({ length: e.photoCount }, (_, i) => <div key={i} className="h-32 w-40 shrink-0 animate-pulse rounded-lg bg-surface-2" />)
-          : photos.map((src, i) => (
-              <button key={i} onClick={() => setBig(src)} aria-label={`Open photo ${i + 1}`} className="shrink-0">
-                <img src={src} alt={`Photo ${i + 1} from ${e.name}`} className="h-32 w-40 rounded-lg object-cover" />
-              </button>
-            ))}
+      <div className={clsx('grid gap-1.5 bg-surface p-2', shown.length === 1 ? 'grid-cols-1' : shown.length === 2 ? 'grid-cols-2' : 'grid-cols-[2fr_1fr_1fr]')} aria-label={`${e.photoCount} photos from ${e.name}`}>
+        {shown.map((src, i) =>
+          src ? (
+            <button key={i} onClick={() => setBig(i)} aria-label={`Open photo ${i + 1}`} className="relative h-36 overflow-hidden rounded-xl">
+              <img src={src} alt={`Photo ${i + 1} from ${e.name}`} className="size-full object-cover" />
+              {i === shown.length - 1 && more > 0 && <span className="absolute inset-0 grid place-items-center bg-ink/55 font-display text-[28px] font-bold text-white">+{more}</span>}
+            </button>
+          ) : (
+            <div key={i} className="h-36 animate-pulse rounded-xl bg-surface-2" />
+          ),
+        )}
       </div>
-      {big && (
-        <button className="fixed inset-0 z-50 grid place-items-center bg-ink/90 p-4" onClick={() => setBig(null)} aria-label="Close photo">
-          <img src={big} alt="" className="max-h-full max-w-full rounded-lg" />
-        </button>
+      {big !== null && photos && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-ink/95 p-3" role="dialog" aria-label="Photos">
+          <button className="ml-auto grid size-12 place-items-center rounded-xl text-white hover:bg-white/10" onClick={() => setBig(null)} aria-label="Close photos">
+            <X className="size-6" />
+          </button>
+          <div className="grid flex-1 place-items-center overflow-hidden">
+            <img src={photos[big]} alt="" className="max-h-full max-w-full rounded-lg" />
+          </div>
+          {photos.length > 1 && (
+            <div className="flex justify-center gap-2 pt-3">
+              {photos.map((src, i) => (
+                <button key={i} onClick={() => setBig(i)} aria-label={`Photo ${i + 1}`} className={clsx('size-14 overflow-hidden rounded-lg border-2', i === big ? 'border-white' : 'border-transparent opacity-60')}>
+                  <img src={src} alt="" className="size-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </>
   );
@@ -345,32 +366,35 @@ function Summary({ e }: { e: RealEnquiry }) {
   const est = estimateOf(profile, e);
   const timing = { asap: 'ASAP', month: 'Next month or two', flexible: 'Flexible', browsing: 'Just getting prices' }[e.timing];
   return (
-    <div>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="text-[21px] leading-tight font-bold">{e.jobLabel}</h2>
-          <p className="mt-0.5 text-[13.5px] text-ink-2">
-            {e.postcode} · {timing}
-            {e.budget ? ` · budget ${aud(e.budget)}` : ''}
-          </p>
+    <div className="space-y-3">
+      <div>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="min-w-0 font-display text-[30px] leading-[1.05] font-bold">{e.jobLabel}</h2>
+          <Badge tone={STATUS[e.status].tone}>{STATUS[e.status].label}</Badge>
         </div>
-        <Badge tone={STATUS[e.status].tone}>{STATUS[e.status].label}</Badge>
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-ink-2">
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="size-4" /> {e.postcode}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <CalendarDays className="size-4" /> {timing}
+          </span>
+          {!!e.budget && <span>Budget {aud(e.budget)}</span>}
+        </p>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Card className="p-3">
-          <p className="flex items-center gap-1 text-[12px] font-semibold text-ink-2">
-            <Sparkles className="size-3.5 text-accent" /> Price guide
+      <PriceFit price={est ? range(est) : null} priceNote={est ? '(incl. GST) from your rates' : 'Add prices in Settings'} score={fit.score} scoreLabel={label.label} tone={label.tone === 'good' ? 'good' : label.tone === 'bad' ? 'bad' : 'mid'} />
+      <Card className="rounded-2xl p-3.5">
+        <p className="flex items-center gap-1.5 text-[14px] font-bold">
+          <FileText className="size-4 text-ink-2" /> Job details
+        </p>
+        <p className="mt-1.5 text-[14.5px] leading-relaxed whitespace-pre-line text-ink">{e.notes?.trim() || `${e.jobLabel}. No description given.`}</p>
+        {!!e.photoCount && (
+          <p className="mt-1 text-[13px] text-ink-3">
+            {e.photoCount} photo{e.photoCount === 1 ? '' : 's'} above.
           </p>
-          <p className={clsx('mt-1 leading-tight font-bold tabular-nums', est ? 'text-[20px]' : 'text-[15px] text-ink-2')}>{est ? range(est) : 'Not priced yet'}</p>
-          <p className="text-[11.5px] text-ink-3">{est ? 'From your rates, incl. GST' : 'Add prices in Settings'}</p>
-        </Card>
-        <Card className={clsx('p-3', label.tone === 'good' ? 'border-good/30 bg-good-soft' : label.tone === 'bad' ? 'border-bad/25 bg-bad-soft' : 'border-mid/25 bg-mid-soft')}>
-          <p className="text-[12px] font-semibold text-ink-2">Fit score</p>
-          <p className={clsx('mt-1 text-[26px] leading-none font-bold tabular-nums', label.tone === 'good' ? 'text-good' : label.tone === 'bad' ? 'text-bad' : 'text-mid')}>{fit.score}</p>
-          <p className="mt-1 text-[11.5px] font-semibold text-ink-2">{label.label}</p>
-        </Card>
-      </div>
-      <p className="mt-1.5 px-1 text-[11.5px] text-ink-3">Only you see the price guide and fit score. Customers only ever see the quote you send.</p>
+        )}
+      </Card>
+      <p className="px-1 text-[12px] text-ink-3">Only you see the price guide and fit score. Customers only ever see the quote you send.</p>
     </div>
   );
 }
@@ -405,7 +429,7 @@ function Facts({ e }: { e: RealEnquiry }) {
         </ul>
       </Card>
       <Card className="p-3">
-        <p className="text-[14px] font-bold">Job details</p>
+        <p className="text-[14px] font-bold">All their answers</p>
         <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13.5px]">
           <Fact k="Job">{e.jobLabel}</Fact>
           {job.questions.map((q) => (
@@ -419,7 +443,6 @@ function Facts({ e }: { e: RealEnquiry }) {
           <Fact k="Postcode">{e.postcode}</Fact>
           <Fact k="Mobile">{e.phone}</Fact>
         </dl>
-        {e.notes && <p className="mt-2 rounded-lg bg-surface-2 p-2.5 text-[14px] whitespace-pre-line text-ink">“{e.notes}”</p>}
       </Card>
     </>
   );

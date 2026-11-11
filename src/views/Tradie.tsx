@@ -1,7 +1,8 @@
 import clsx from 'clsx';
-import { ArrowLeft, BarChart3, Check, ChevronRight, Clock, Image, Inbox, MessageSquare, Settings as Cog, Sparkles, TrendingUp, X } from 'lucide-react';
+import { ArrowLeft, BarChart3, CalendarClock, CalendarDays, Check, Clock, FileText, HardHat, Image, MapPin, MessageSquare, Phone, Settings as Cog, TrendingUp, Wrench, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Badge, Button, Card, Field, inputCls, Stat } from '../components/ui';
+import { AppHeader, ListCard, ListRow, PriceFit, SectionTitle, StatusLine, TabBar, Thumb } from '../components/worksite';
 import { PLAN_PRICE, results } from '../lib/metrics';
 import { aud, fitLabel, jobOf, range, suggestAction, TRADES, type Suggestion } from '../lib/pricing';
 import { approveFollowUp, draftFor, draftQuote, markOutcome, priceRise, reprice, respond, sendQuote, skipFollowUp, updateProfile, useAppState } from '../lib/store';
@@ -22,33 +23,30 @@ export function TradiePhone() {
 
   return (
     <>
-      <header className="border-b border-line bg-surface px-4 py-3">
-        <p className="text-[12px] text-ink-3">{s.profile.business}</p>
-        <h2 className="text-[17px] font-semibold">{tab === 'inbox' ? 'Enquiries' : tab === 'quotes' ? 'Quotes out' : tab === 'results' ? 'Results' : 'Settings'}</h2>
-      </header>
-      <div className="scroll-thin flex-1 overflow-y-auto bg-bg/50">
+      <AppHeader
+        title={tab === 'inbox' ? 'Today' : tab === 'quotes' ? 'Quotes out' : tab === 'results' ? 'Results' : 'Settings'}
+        subtitle={tab === 'inbox' ? (needs ? 'What to do next' : 'Nothing waiting on you') : s.profile.business}
+        compact={tab !== 'inbox'}
+        right={tab === 'inbox' ? undefined : <span />}
+      />
+      <div className="scroll-thin flex-1 overflow-y-auto bg-bg pb-4">
         {tab === 'inbox' && <InboxList onOpen={setOpenId} />}
         {tab === 'quotes' && <QuotesList onOpen={setOpenId} />}
         {tab === 'results' && <Results />}
         {tab === 'settings' && <Settings />}
       </div>
-      <nav className="grid grid-cols-4 border-t border-line bg-surface" aria-label="Tradie app">
-        <TabBtn icon={<Inbox className="size-5" />} label="Inbox" active={tab === 'inbox'} onClick={() => setTab('inbox')} count={needs} />
-        <TabBtn icon={<MessageSquare className="size-5" />} label="Quotes" active={tab === 'quotes'} onClick={() => setTab('quotes')} count={r.awaiting} />
-        <TabBtn icon={<BarChart3 className="size-5" />} label="Results" active={tab === 'results'} onClick={() => setTab('results')} />
-        <TabBtn icon={<Cog className="size-5" />} label="Settings" active={tab === 'settings'} onClick={() => setTab('settings')} />
-      </nav>
+      <TabBar
+        fixed={false}
+        active={tab}
+        onChange={setTab}
+        items={[
+          { id: 'inbox', icon: <CalendarDays className="size-6" />, label: 'Today', count: needs },
+          { id: 'quotes', icon: <FileText className="size-6" />, label: 'Quotes', count: r.awaiting },
+          { id: 'results', icon: <BarChart3 className="size-6" />, label: 'Results' },
+          { id: 'settings', icon: <Cog className="size-6" />, label: 'Settings' },
+        ]}
+      />
     </>
-  );
-}
-
-function TabBtn({ icon, label, active, onClick, count }: { icon: ReactNode; label: string; active: boolean; onClick: () => void; count?: number }) {
-  return (
-    <button onClick={onClick} aria-current={active ? 'page' : undefined} className={clsx('relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium', active ? 'text-navy' : 'text-ink-3')}>
-      {icon}
-      {label}
-      {!!count && <span className="absolute top-1 right-[calc(50%-20px)] grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] text-white">{count}</span>}
-    </button>
   );
 }
 
@@ -67,34 +65,53 @@ const STATUS: Record<Status, { label: string; tone: 'good' | 'mid' | 'bad' | 'ne
   declined: { label: 'Declined', tone: 'neutral' },
 };
 
+const LINE: Record<Status, { text: string; tone: 'accent' | 'navy' | 'good' | 'muted' }> = {
+  new: { text: 'New', tone: 'accent' },
+  visit_booked: { text: 'Quote due', tone: 'accent' },
+  ballpark: { text: 'Ballpark sent', tone: 'muted' },
+  visit_offered: { text: 'Visit offered', tone: 'muted' },
+  quoted: { text: 'Quoted', tone: 'navy' },
+  won: { text: 'Won', tone: 'good' },
+  lost: { text: 'Lost', tone: 'muted' },
+  declined: { text: 'Declined', tone: 'muted' },
+};
+
 function Row({ e, onOpen, extra }: { e: Enquiry; onOpen: (id: string) => void; extra?: ReactNode }) {
   const s = useAppState();
   const fit = fitLabel(e.fit.score);
   return (
-    <button onClick={() => onOpen(e.id)} className="flex w-full items-center gap-3 border-b border-line bg-surface px-4 py-3 text-left hover:bg-surface-2">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-[14px] font-semibold">{e.name}</p>
-          <Badge tone={STATUS[e.status].tone}>{STATUS[e.status].label}</Badge>
-        </div>
-        <p className="mt-0.5 truncate text-[12.5px] text-ink-2">
-          {jobOf(s.profile.trade, e.jobType).label} · {e.suburb} · {e.quote ? aud(e.quote.amount) : range(e.estimate)}
-        </p>
-        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          {e.status === 'new' && <Badge tone={fit.tone}>{fit.label} · {e.fit.score}</Badge>}
-          {extra}
-        </div>
-      </div>
-      <ChevronRight className="size-4 shrink-0 text-ink-3" />
-    </button>
+    <ListRow
+      onClick={() => onOpen(e.id)}
+      thumb={<Thumb icon={<Wrench />} count={e.photos} />}
+      title={
+        <>
+          {jobOf(s.profile.trade, e.jobType).label} <span className="font-medium text-ink-2">– {e.name}</span>
+        </>
+      }
+      sub={<StatusLine status={LINE[e.status].text} tone={LINE[e.status].tone} rest={`${e.suburb} · ${e.quote ? aud(e.quote.amount) : range(e.estimate)}`} />}
+      extra={
+        e.status === 'new' || extra ? (
+          <>
+            {e.status === 'new' && (
+              <Badge tone={fit.tone}>
+                {fit.label} · {e.fit.score}%
+              </Badge>
+            )}
+            {extra}
+          </>
+        ) : undefined
+      }
+    />
   );
 }
 
-function Section({ title, children, empty }: { title: string; children: ReactNode[]; empty?: string }) {
+function Section({ title, icon, count, children, empty }: { title: string; icon: ReactNode; count?: number; children: ReactNode[]; empty?: string }) {
   return (
     <div>
-      <p className="px-4 pt-4 pb-1.5 text-[11.5px] font-semibold tracking-wide text-ink-3 uppercase">{title}</p>
-      {children.length ? children : empty ? <p className="px-4 pb-2 text-[13px] text-ink-3">{empty}</p> : null}
+      <SectionTitle icon={icon} count={count}>
+        {title}
+      </SectionTitle>
+      {children.length ? <ListCard>{children}</ListCard> : empty ? <p className="px-4 pb-2 text-[13.5px] text-ink-3">{empty}</p> : null}
     </div>
   );
 }
@@ -113,17 +130,17 @@ function InboxList({ onOpen }: { onOpen: (id: string) => void }) {
   );
   return (
     <>
-      <Section title={`Needs you (${needs.length})`} empty="All caught up.">
+      <Section title="Needs you" icon={<HardHat />} count={needs.length} empty="All caught up.">
         {needs.map((e) => (
           <Row key={e.id} e={e} onOpen={onOpen} extra={extra(e)} />
         ))}
       </Section>
-      <Section title={`Waiting on the customer (${waiting.length})`} empty="Nothing waiting.">
+      <Section title="Waiting on the customer" icon={<Clock />} empty="Nothing waiting.">
         {waiting.map((e) => (
           <Row key={e.id} e={e} onOpen={onOpen} />
         ))}
       </Section>
-      <Section title={`Closed (${closed.length})`}>
+      <Section title="Closed" icon={<Check />}>
         {closed.map((e) => (
           <Row key={e.id} e={e} onOpen={onOpen} />
         ))}
@@ -167,7 +184,7 @@ function QuotesList({ onOpen }: { onOpen: (id: string) => void }) {
           </p>
         </Card>
       </div>
-      <Section title="Following up" empty="No open quotes. Send one from an enquiry with a booked visit.">
+      <Section title="Following up" icon={<CalendarClock />} count={out.length} empty="No open quotes. Send one from an enquiry with a booked visit.">
         {out.map((e) => {
           const next = e.followUps.find((f) => f.status === 'scheduled' || f.status === 'awaiting');
           return (
@@ -280,21 +297,21 @@ function Detail({ e, onBack }: { e: Enquiry; onBack: () => void }) {
   const job = jobOf(s.profile.trade, e.jobType);
   return (
     <>
-      <header className="flex items-center gap-2 border-b border-line bg-surface px-2 py-2">
-        <Button variant="ghost" size="sm" onClick={onBack} aria-label="Back">
-          <ArrowLeft className="size-4" />
-        </Button>
+      <header className="flex items-center gap-1 bg-navy px-1.5 py-2.5 text-white">
+        <button onClick={onBack} aria-label="Back" className="grid size-11 place-items-center rounded-xl hover:bg-white/10">
+          <ArrowLeft className="size-5" />
+        </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14.5px] font-semibold">{e.name}</p>
-          <p className="truncate text-[12px] text-ink-3">
-            {job.label} · {e.suburb} · {e.phone}
-          </p>
+          <p className="truncate font-display text-[23px] leading-tight font-bold">{e.name}</p>
+          <p className="truncate text-[12.5px] text-white/75">Enquiry · {e.phone}</p>
         </div>
-        <Badge tone={STATUS[e.status].tone}>{STATUS[e.status].label}</Badge>
+        <span className="grid size-11 place-items-center rounded-xl" aria-hidden>
+          <Phone className="size-5" />
+        </span>
       </header>
       <div className="grid grid-cols-2 gap-1 border-b border-line bg-surface p-1.5">
         {(['details', 'messages'] as const).map((v) => (
-          <button key={v} onClick={() => setView(v)} className={clsx('h-8 rounded-md text-[13px] font-medium', view === v ? 'bg-surface-2 text-ink' : 'text-ink-3')}>
+          <button key={v} onClick={() => setView(v)} className={clsx('h-9 rounded-lg text-[13.5px] font-semibold', view === v ? 'bg-navy text-white' : 'text-ink-2')}>
             {v === 'details' ? 'Details' : `Messages (${e.messages.length})`}
           </button>
         ))}
@@ -302,7 +319,22 @@ function Detail({ e, onBack }: { e: Enquiry; onBack: () => void }) {
       {view === 'messages' ? (
         <Thread e={e} side="tradie" />
       ) : (
-        <div className="scroll-thin flex-1 space-y-3 overflow-y-auto bg-bg/50 p-3">
+        <div className="scroll-thin flex-1 space-y-3 overflow-y-auto bg-bg p-3">
+          <div>
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="min-w-0 font-display text-[28px] leading-[1.05] font-bold">{job.label}</h2>
+              <Badge tone={STATUS[e.status].tone}>{STATUS[e.status].label}</Badge>
+            </div>
+            <p className="mt-1.5 flex flex-wrap gap-x-4 text-[13.5px] text-ink-2">
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="size-4" /> {e.suburb}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="size-4" /> {{ asap: 'ASAP', month: 'Next month or two', flexible: 'Flexible', browsing: 'Just getting prices' }[e.timing]}
+              </span>
+            </p>
+          </div>
+          <PriceFit price={range(e.estimate)} priceNote="(incl. GST) from your rates" score={e.fit.score} scoreLabel={fitLabel(e.fit.score).label} tone={fitLabel(e.fit.score).tone === 'good' ? 'good' : fitLabel(e.fit.score).tone === 'bad' ? 'bad' : 'mid'} />
           <ActionPanel e={e} onShowMessages={() => setView('messages')} />
           <EnquiryFacts e={e} />
         </div>
@@ -381,10 +413,10 @@ const Fact = ({ k, v }: { k: string; v: string }) => (
   </>
 );
 
-const ACTIONS: Record<Suggestion, { label: string; desc: string }> = {
-  visit: { label: 'Offer a paid site visit', desc: 'Send the range and a booking link with a deposit.' },
-  ballpark: { label: 'Send a ballpark', desc: 'Send the range first. They book a paid visit if it suits.' },
-  decline: { label: 'Decline politely', desc: 'A kind no, without a drive or a phone call.' },
+const ACTIONS: Record<Suggestion, { short: string; label: string; desc: string }> = {
+  visit: { short: 'offer a visit', label: 'Offer a paid site visit', desc: 'Send the range and a booking link with a deposit.' },
+  ballpark: { short: 'send a ballpark', label: 'Send a ballpark', desc: 'Send the range first. They book a paid visit if it suits.' },
+  decline: { short: 'decline politely', label: 'Decline politely', desc: 'A kind no, without a drive or a phone call.' },
 };
 
 function ActionPanel({ e, onShowMessages }: { e: Enquiry; onShowMessages: () => void }) {
@@ -421,25 +453,20 @@ function NewActions({ e, onSent }: { e: Enquiry; onSent: () => void }) {
   };
   return (
     <Card className="p-3">
-      <p className="flex items-center gap-1.5 text-[12px] text-ink-3">
-        <Sparkles className="size-3.5 text-accent" /> Price range from your rates
-      </p>
-      <p className="text-[24px] font-semibold tabular-nums">{range(e.estimate)}</p>
+      <p className="font-display text-[22px] leading-tight font-bold">{choice ? ACTIONS[choice].label : 'Reply'}</p>
       {!choice ? (
         <div className="mt-3 space-y-2">
-          {(['visit', 'ballpark', 'decline'] as const).map((a) => (
-            <button
-              key={a}
-              onClick={() => pick(a)}
-              className={clsx('w-full rounded-lg border p-3 text-left hover:bg-surface-2', a === suggestion ? 'border-accent bg-accent-soft/50' : 'border-line')}
-            >
-              <span className="flex items-center gap-2 text-[13.5px] font-semibold">
+          <Button variant="accent" className="h-14 w-full text-[16px]" onClick={() => pick(suggestion)}>
+            <MessageSquare className="size-5" /> Reply by text
+          </Button>
+          <p className="px-1 pb-1 text-[13px] text-ink-2"><strong className="text-ink">Suggested: {ACTIONS[suggestion].short}.</strong> {ACTIONS[suggestion].desc}</p>
+          {(['visit', 'ballpark', 'decline'] as const)
+            .filter((a) => a !== suggestion)
+            .map((a) => (
+              <Button key={a} className="w-full" onClick={() => pick(a)}>
                 {ACTIONS[a].label}
-                {a === suggestion && <Badge tone="accent">Suggested</Badge>}
-              </span>
-              <span className="block text-[12.5px] text-ink-2">{ACTIONS[a].desc}</span>
-            </button>
-          ))}
+              </Button>
+            ))}
         </div>
       ) : (
         <div className="mt-3 space-y-2">
